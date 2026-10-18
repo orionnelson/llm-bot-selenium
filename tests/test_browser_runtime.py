@@ -71,4 +71,3 @@ class BrowserRuntimeTests(unittest.TestCase):
         binary, driver = runtime_paths('edge', 'relative/msedge', 'relative/msedgedriver')
         self.assertEqual(binary, str(Path('relative/msedge').resolve()))
         self.assertEqual(driver, str(Path('relative/msedgedriver').resolve()))
-
