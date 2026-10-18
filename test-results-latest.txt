@@ -17,6 +17,19 @@ test_invalid_browser_rejected (test_browser_runtime.BrowserRuntimeTests.test_inv
 test_missing_paths_rejected_before_selenium_can_download (test_browser_runtime.BrowserRuntimeTests.test_missing_paths_rejected_before_selenium_can_download) ... ok
 test_original_chrome_environment_still_selects_chrome (test_browser_runtime.BrowserRuntimeTests.test_original_chrome_environment_still_selects_chrome) ... ok
 test_relative_paths_are_resolved_before_subprocess_changes_cwd (test_browser_runtime.BrowserRuntimeTests.test_relative_paths_are_resolved_before_subprocess_changes_cwd) ... ok
+test_explicit_consent_scope_and_stop (test_chart_checks.ChartJourneyTests.test_explicit_consent_scope_and_stop) ... ok
+test_explicit_stop_shared_session_and_clock_rollback (test_chart_checks.ChartJourneyTests.test_explicit_stop_shared_session_and_clock_rollback) ... ok
+test_invalid_evidence_is_unknown_not_healthy (test_chart_checks.ChartJourneyTests.test_invalid_evidence_is_unknown_not_healthy) ... ok
+test_investigation_rejects_reused_observer_evidence (test_chart_checks.ChartJourneyTests.test_investigation_rejects_reused_observer_evidence) ... ok
+test_investigation_stops_on_stale_issue_or_shared_session (test_chart_checks.ChartJourneyTests.test_investigation_stops_on_stale_issue_or_shared_session) ... ok
+test_missed_ticks_do_not_burst_and_repeated_evidence_is_unknown (test_chart_checks.ChartJourneyTests.test_missed_ticks_do_not_burst_and_repeated_evidence_is_unknown) ... ok
+test_observer_issue_independent_path_and_grounded_conclusion (test_chart_checks.ChartJourneyTests.test_observer_issue_independent_path_and_grounded_conclusion) ... ok
+test_plan_bounds_and_schema_guards (test_chart_checks.ChartJourneyTests.test_plan_bounds_and_schema_guards) ... ok
+test_raw_misleading_page_text_cannot_become_numeric_evidence (test_chart_checks.ChartJourneyTests.test_raw_misleading_page_text_cannot_become_numeric_evidence) ... ok
+test_read_failure_reports_uncertainty_without_exception_leak (test_chart_checks.ChartJourneyTests.test_read_failure_reports_uncertainty_without_exception_leak) ... ok
+test_release_cadence_failure_dedupe_recovery_and_bounded_end (test_chart_checks.ChartJourneyTests.test_release_cadence_failure_dedupe_recovery_and_bounded_end) ... ok
+test_release_unknown_evidence_and_expired_session_stop (test_chart_checks.ChartJourneyTests.test_release_unknown_evidence_and_expired_session_stop) ... ok
+test_validation_requires_rule_and_valid_current_observation (test_chart_checks.ChartJourneyTests.test_validation_requires_rule_and_valid_current_observation) ... ok
 test_bad_contexts (test_core.CoreTests.test_bad_contexts) ... ok
 test_budget_stops_unresolved (test_core.CoreTests.test_budget_stops_unresolved) ... ok
 test_candidate_cannot_be_reused (test_core.CoreTests.test_candidate_cannot_be_reused) ... ok
@@ -61,6 +74,6 @@ test_weekend_and_interval_policy_without_live_scheduling (test_weekend.WeekendTe
 test_weekend_uses_selected_timezone_not_utc_weekday (test_weekend.WeekendTests.test_weekend_uses_selected_timezone_not_utc_weekday) ... ok
 
 ----------------------------------------------------------------------
-Ran 61 tests in 2.652s
+Ran 74 tests in 2.654s
 
 OK (skipped=1)
