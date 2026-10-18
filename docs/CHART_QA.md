@@ -1,4 +1,6 @@
-# Connected chart slice — 2026-10-18
+# Connected chart contract slice — 2026-10-18 14:00 UTC
+
+Historical contract baseline below. Current DOM integration and latest 78PASS/2SKIP evidence: [BROWSER_CHART_QA.md](BROWSER_CHART_QA.md).
 
 ## Executed locally
 

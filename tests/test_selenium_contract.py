@@ -14,6 +14,10 @@ class Element:
     def __init__(self, attrs, driver):
         self.attrs = dict(attrs)
         self.driver = driver
+        self.text = ''
+
+    def is_displayed(self):
+        return True  # fake contract only; real rendering belongs to browser acceptance
 
     def get_attribute(self, name):
         return self.attrs.get(name)
@@ -29,24 +33,35 @@ class DOM(HTMLParser):
         self.driver = driver
         self.elements = []
         self.script = None
+        self.chart = None
 
     def handle_starttag(self, tag, attrs):
         element = Element(attrs, self.driver)
         self.elements.append(element)
+        if 'data-chart-view' in element.attrs:
+            self.chart = element
         if tag == "script" and element.attrs.get("id") == "result":
             self.script = element
 
     def handle_endtag(self, tag):
+        if tag == 'div':
+            self.chart = None
         if tag == "script":
             self.script = None
 
     def handle_data(self, data):
+        if self.chart:
+            self.chart.text += data
         if self.script:
             self.script.attrs["textContent"] = self.script.attrs.get("textContent", "") + data
 
 
 class FakeHTTPDriver:
     """Only supports the exact mock contract; does not execute JS or render CSS."""
+    def __init__(self):
+        from uuid import uuid4
+        self.session_id = 'fake-' + uuid4().hex
+
     def set_page_load_timeout(self, seconds):
         self.timeout = seconds
 
@@ -58,6 +73,8 @@ class FakeHTTPDriver:
         self.dom.feed(text)
 
     def find_elements(self, by, selector):
+        if selector == '[data-chart-view]':
+            return [e for e in self.dom.elements if 'data-chart-view' in e.attrs]
         if selector == '[data-ui-version]':
             return [e for e in self.dom.elements if "data-ui-version" in e.attrs]
         if selector == '[data-query]':

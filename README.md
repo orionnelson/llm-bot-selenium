@@ -17,7 +17,7 @@ flowchart LR
     Release --> Report["Fresh check results + failure / unknown reports"]
 ```
 
-**Status:** a deterministic **synthetic contract slice** now connects consented semantic navigation/shortcut events → issue bundle → separate-session chart investigation → the same SRE-validated chart check in bounded release ticks. It does not install an observer or scheduler. Real browser capture, model-led page understanding and browser-backed chart execution are still acceptance gates; fixture tests do not establish end-to-end acceptance.
+**Status:** synthetic chart contracts now connect to a **loopback-only Selenium DOM adapter**: consented semantic navigation/shortcut submissions → visible numeric evidence → issue → separate-driver investigation → the same validated check in bounded release ticks. HTTP/fake-DOM tests pass; a two-browser acceptance test is included but blocked by missing binaries. No event listener or scheduler is installed. Actual browser execution and model-led understanding remain acceptance gates.
 
 ## Try the current prototype
 
@@ -46,11 +46,11 @@ On Windows, quote executable paths such as `"C:\Program Files (x86)\Microsoft\Ed
 
 ## Scope and evidence
 
-- Latest local suite: **73 passed, 1 real-browser skipped**. Actual Edge/Chrome, Windows, SSO and live-model investigation are not validated here.
+- Latest local suite: **78 passed, 2 real-browser skipped**. Actual Edge/Chrome, Windows, SSO and live-model investigation are not validated here.
 - Observe only consented pages. Do not record passwords, arbitrary keystrokes, cookies or tokens. The bot must not interfere with the SRE's browser.
 - Missing/stale data, wrong context or an expired session must not be reported as healthy.
 - The development cron builds these features; it does **not** enable a real five-minute production monitor or alerts.
 
-[Synthetic chart-check QA](docs/CHART_QA.md) · [Architecture and current boundaries](docs/ARCHITECTURE.md) · [Acceptance requirements](docs/REQUIREMENTS.md) · [Executed browser QA](EDGE_QA.md)
+[Chart DOM QA](docs/BROWSER_CHART_QA.md) · [Contract QA](docs/CHART_QA.md) · [Architecture and current boundaries](docs/ARCHITECTURE.md) · [Acceptance requirements](docs/REQUIREMENTS.md) · [Executed browser QA](EDGE_QA.md)
 
 Tested feature PRs auto-merge into `blue-master`. Releases into `main` remain human-controlled.

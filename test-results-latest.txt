@@ -17,6 +17,11 @@ test_invalid_browser_rejected (test_browser_runtime.BrowserRuntimeTests.test_inv
 test_missing_paths_rejected_before_selenium_can_download (test_browser_runtime.BrowserRuntimeTests.test_missing_paths_rejected_before_selenium_can_download) ... ok
 test_original_chrome_environment_still_selects_chrome (test_browser_runtime.BrowserRuntimeTests.test_original_chrome_environment_still_selects_chrome) ... ok
 test_relative_paths_are_resolved_before_subprocess_changes_cwd (test_browser_runtime.BrowserRuntimeTests.test_relative_paths_are_resolved_before_subprocess_changes_cwd) ... ok
+test_dom_loading_missing_stale_drift_session_and_changed_filters (test_chart_browser.ChartDOMTests.test_dom_loading_missing_stale_drift_session_and_changed_filters) ... ok
+test_guards_before_dom_access_and_navigation (test_chart_browser.ChartDOMTests.test_guards_before_dom_access_and_navigation) ... ok
+test_http_dom_observation_independent_navigation_and_release_reuse (test_chart_browser.ChartDOMTests.test_http_dom_observation_independent_navigation_and_release_reuse) ... ok
+test_redirect_during_wait_is_rejected_before_reading_payload (test_chart_browser.ChartDOMTests.test_redirect_during_wait_is_rejected_before_reading_payload) ... ok
+test_session_identity_cannot_be_aliased_and_origin_hidden_payload_fail_closed (test_chart_browser.ChartDOMTests.test_session_identity_cannot_be_aliased_and_origin_hidden_payload_fail_closed) ... ok
 test_explicit_consent_scope_and_stop (test_chart_checks.ChartJourneyTests.test_explicit_consent_scope_and_stop) ... ok
 test_explicit_stop_shared_session_and_clock_rollback (test_chart_checks.ChartJourneyTests.test_explicit_stop_shared_session_and_clock_rollback) ... ok
 test_invalid_evidence_is_unknown_not_healthy (test_chart_checks.ChartJourneyTests.test_invalid_evidence_is_unknown_not_healthy) ... ok
@@ -64,6 +69,7 @@ test_seeded_cold_warm_and_counterexample_matrix (test_evaluation.EvaluationTests
 test_discovery_catalog_and_query_contract (test_mock_http.MockHTTPTests.test_discovery_catalog_and_query_contract) ... ok
 test_forbidden_mock_query_rejected (test_mock_http.MockHTTPTests.test_forbidden_mock_query_rejected) ... ok
 test_actual_browser_discover_learn_and_generated_script_reuse (test_selenium_browser.SeleniumBrowserTests.test_actual_browser_discover_learn_and_generated_script_reuse) ... skipped 'NOT RUN: explicit browser binary, matching driver and Selenium required'
+test_actual_two_browser_chart_issue_and_bounded_release (test_selenium_browser.SeleniumBrowserTests.test_actual_two_browser_chart_issue_and_bounded_release) ... skipped 'NOT RUN: explicit browser binary, matching driver and Selenium required'
 test_expired_session_is_rejected_from_mock_ui_evidence (test_selenium_contract.SeleniumContractTests.test_expired_session_is_rejected_from_mock_ui_evidence) ... ok
 test_forbidden_action_rejected_by_adapter_before_navigation (test_selenium_contract.SeleniumContractTests.test_forbidden_action_rejected_by_adapter_before_navigation) ... ok
 test_selenium_adapter_contract_with_real_http_and_fake_dom (test_selenium_contract.SeleniumContractTests.test_selenium_adapter_contract_with_real_http_and_fake_dom) ... ok
@@ -74,6 +80,6 @@ test_weekend_and_interval_policy_without_live_scheduling (test_weekend.WeekendTe
 test_weekend_uses_selected_timezone_not_utc_weekday (test_weekend.WeekendTests.test_weekend_uses_selected_timezone_not_utc_weekday) ... ok
 
 ----------------------------------------------------------------------
-Ran 74 tests in 2.654s
+Ran 80 tests in 5.214s
 
-OK (skipped=1)
+OK (skipped=2)
