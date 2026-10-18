@@ -67,7 +67,7 @@ The original `CHROME_BINARY` + `CHROMEDRIVER` setup still selects Chrome unless 
 
 The probe writes runtime status, logs, and—on genuine browser success—a screenshot and browser/version summary under `artifacts/browser`. Ready executable checks and mocked constructor tests are **not** real-browser passes. No Edge/Chrome binaries are available in the current environment; the real-browser test is skipped.
 
-Runs use temporary profiles, keep sandboxing enabled, and target only the synthetic loopback UI. The [runtime image recipe](runtime/README.md) remains **Chromium-only** and unbuilt, not an Edge installation recipe.
+Runs use temporary profiles, keep sandboxing enabled, and target only the synthetic loopback UI. See [runtime setup](runtime/README.md). Container packaging is deferred; the unused Chromium-only recipe was removed.
 
 ## Learning demonstration
 

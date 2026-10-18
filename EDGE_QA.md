@@ -1,19 +1,16 @@
-# Edge target validation
+# Edge/Chrome validation
 
-- Microsoft Edge/msedgedriver is the primary runtime; explicit Chrome remains supported.
-- Python 3.11 regression execution: 62 tests, **61 passed / 1 real-browser skipped**.
-- Real Selenium 4 options/services exercised with mocked Edge and Chrome constructors. Both receive explicit executables and isolated profile paths; no Selenium Manager fallback or sandbox bypass.
-- Configuration discovery, legacy Chrome environment selection and missing-runtime failures covered.
-- Python compilation and Git whitespace validation passed.
-- Actual Edge probe: blocked (Edge + msedgedriver absent).
-- Actual Chrome probe: blocked (Chrome + chromedriver absent).
-- Therefore no real-browser, Windows-host, SSO, or actual LLM navigation success is claimed. Windows launch/cleanup support is code-reviewed, not Windows-executed.
-- Version compatibility is delegated to the installed browser/driver pair; use a matching driver. Startup failures surface as failures rather than test passes.
+**Executed:** Python 3.11, 61 tests: **60 passed / 1 real-browser skipped**. Compilation and whitespace checks passed. Full output: `test-results-latest.txt`.
 
-## Pre-merge DRY review
+Both constructors use real Selenium options/services with mocked launches. Regressions cover browser selection, explicit executable paths, relative-path resolution and conflicting options.
 
-- Centralized browser environment names, executable candidates and Selenium class names in one small immutable BrowserSpec map; probe, constructor and real-browser test share it.
-- Shared executable validation and child-environment mapping; removed unused import and duplicated log writes.
-- Fixed two concrete edge cases: explicit Edge binary could lose to ambient Chrome selection; relative executable paths broke when child CWD changed. Added four regressions.
-- Centralized conflicting-option validation; invalid CLI arguments no longer create output directories.
-- Full rerun: 62 tests, 61 passed, one real-browser skipped. Compilation and whitespace checks passed. No unrelated monitoring refactor or real-browser claim.
+**Blocked:** actual Edge/Chrome execution; neither browser/driver pair is installed. Windows launch/cleanup code has not run on Windows. No SSO, production monitoring or actual LLM investigation pass is claimed.
+
+## Scope review
+
+- Keep: Edge + Chrome, explicit drivers, isolated profiles, timeout cleanup, synthetic UI, evidence/learning tests and CI.
+- Simplify: replace BrowserSpec class/registry with two environment-name pairs; remove wrapper helpers and duplicate output handling.
+- Defer: container packaging; remove the unbuilt Chromium-only Dockerfile. No automatic installers, deployment or new orchestration.
+- Retain existing optional audit/registry/weekend modules because they implement the requested learning/monitoring prototype; they are not production acceptance or prerequisites for the browser test.
+
+Runtime/probe source: **178 → 139 lines** versus the first PR #4 revision; **153 → 139** versus merged PR #3. This is a source-line comparison, not minification or a performance claim. The removed container recipe is a further 18 lines.

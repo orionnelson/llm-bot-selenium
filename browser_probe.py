@@ -14,13 +14,12 @@ import tempfile
 
 
 def inspect_runtime(chrome=None, driver=None, *, browser=None, edge=None):
-    from triage.browser_runtime import (selected_browser, runtime_paths, browser_spec,
-                                       is_executable)
+    from triage.browser_runtime import (BROWSER_ENV, selected_browser, runtime_paths, is_executable)
     if (chrome and edge) or (browser == 'edge' and chrome) or (browser == 'chrome' and edge):
         raise ValueError('Browser and binary options disagree')
     browser = selected_browser(browser or ('chrome' if chrome else 'edge' if edge else None))
     binary, driver = runtime_paths(browser, edge if browser == 'edge' else chrome, driver)
-    labels = (browser, browser_spec(browser).driver_name)
+    labels = (browser, BROWSER_ENV[browser][1].lower())
     missing = []
     if importlib.util.find_spec("selenium") is None:
         missing.append("selenium-package")
@@ -33,13 +32,13 @@ def inspect_runtime(chrome=None, driver=None, *, browser=None, edge=None):
             "scope": "isolated synthetic browser only; no live LLM or SSO"}
 
 
-def stop_process_tree(process, force=False):
+def stop_process_tree(process):
     if os.name == "nt":
         subprocess.run(["taskkill", "/PID", str(process.pid), "/T", "/F"],
                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=10)
     else:
         try:
-            os.killpg(process.pid, signal.SIGKILL if force else signal.SIGTERM)
+            os.killpg(process.pid, signal.SIGKILL)
         except ProcessLookupError:
             pass
 
@@ -66,34 +65,28 @@ def main():
                ("PATH", "LANG", "LC_ALL", "TZ", "LD_LIBRARY_PATH", "PYTHONHOME", "VIRTUAL_ENV",
                 "SYSTEMROOT", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP")}
         with tempfile.TemporaryDirectory(prefix="triage-test-home-") as home:
-            from triage.browser_runtime import runtime_environment
+            from triage.browser_runtime import BROWSER_ENV
             env.update(HOME=home, USERPROFILE=home, LOCALAPPDATA=home,
                        BROWSER_ARTIFACT_DIR=str(output))
-            env.update(runtime_environment(report["browser"], report["binary"], report["driver"]))
+            env["SELENIUM_BROWSER"] = report["browser"]
+            env.update(zip(BROWSER_ENV[report["browser"]], (report["binary"], report["driver"])))
             process = subprocess.Popen([sys.executable, "-m", "unittest", "discover", "-s", "tests",
                                         "-p", "test_selenium_browser.py", "-v"],
                                        cwd=Path(__file__).resolve().parent, env=env,
-                                       stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                                       stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                                        text=True, start_new_session=os.name != "nt",
                                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
             try:
-                stdout, stderr = process.communicate(timeout=120)
-                exit_code = process.returncode
-                report["status"] = "passed" if exit_code == 0 and "skipped" not in stderr.lower() else "failed"
-                if report["status"] == "failed" and exit_code == 0:
-                    exit_code = 1
-                report["test_exit_code"] = exit_code
+                stdout, _ = process.communicate(timeout=120)
+                exit_code = process.returncode or int("skipped" in stdout.lower())
+                report.update(status="failed" if exit_code else "passed", test_exit_code=exit_code)
             except subprocess.TimeoutExpired:
-                # Stop the test's process group, including its driver descendants.
+                # Synthetic test timed out: stop its driver descendants too.
                 stop_process_tree(process)
-                try:
-                    stdout, stderr = process.communicate(timeout=5)
-                except subprocess.TimeoutExpired:
-                    stop_process_tree(process, force=True)
-                    stdout, stderr = process.communicate()
+                stdout, _ = process.communicate(timeout=10)
                 report["status"] = "failed-timeout"
                 exit_code = 1
-            (output / "browser-test.log").write_text(stdout + stderr)
+            (output / "browser-test.log").write_text(stdout)
     (output / "runtime-report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
     return exit_code

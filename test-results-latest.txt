@@ -17,7 +17,6 @@ test_invalid_browser_rejected (test_browser_runtime.BrowserRuntimeTests.test_inv
 test_missing_paths_rejected_before_selenium_can_download (test_browser_runtime.BrowserRuntimeTests.test_missing_paths_rejected_before_selenium_can_download) ... ok
 test_original_chrome_environment_still_selects_chrome (test_browser_runtime.BrowserRuntimeTests.test_original_chrome_environment_still_selects_chrome) ... ok
 test_relative_paths_are_resolved_before_subprocess_changes_cwd (test_browser_runtime.BrowserRuntimeTests.test_relative_paths_are_resolved_before_subprocess_changes_cwd) ... ok
-test_runtime_environment_uses_shared_browser_spec (test_browser_runtime.BrowserRuntimeTests.test_runtime_environment_uses_shared_browser_spec) ... ok
 test_bad_contexts (test_core.CoreTests.test_bad_contexts) ... ok
 test_budget_stops_unresolved (test_core.CoreTests.test_budget_stops_unresolved) ... ok
 test_candidate_cannot_be_reused (test_core.CoreTests.test_candidate_cannot_be_reused) ... ok
@@ -62,6 +61,6 @@ test_weekend_and_interval_policy_without_live_scheduling (test_weekend.WeekendTe
 test_weekend_uses_selected_timezone_not_utc_weekday (test_weekend.WeekendTests.test_weekend_uses_selected_timezone_not_utc_weekday) ... ok
 
 ----------------------------------------------------------------------
-Ran 62 tests in 2.668s
+Ran 61 tests in 2.652s
 
 OK (skipped=1)

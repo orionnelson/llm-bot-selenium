@@ -72,10 +72,3 @@ class BrowserRuntimeTests(unittest.TestCase):
         self.assertEqual(binary, str(Path('relative/msedge').resolve()))
         self.assertEqual(driver, str(Path('relative/msedgedriver').resolve()))
 
-    def test_runtime_environment_uses_shared_browser_spec(self):
-        from triage.browser_runtime import browser_spec, runtime_environment
-        for browser in ('edge', 'chrome'):
-            with self.subTest(browser=browser):
-                spec = browser_spec(browser)
-                self.assertEqual(runtime_environment(browser, '/browser', '/driver'), {
-                    'SELENIUM_BROWSER': browser, spec.binary_env: '/browser', spec.driver_env: '/driver'})
