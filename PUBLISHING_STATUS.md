@@ -1,0 +1,1 @@
+Current source snapshot. Fresh local test execution: 52 discovered, 51 passed, 1 real-browser test skipped. No real browser/SSO/production or actual LLM investigation success claimed. Known defects remain documented in README.
