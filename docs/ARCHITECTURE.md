@@ -1,48 +1,81 @@
 # Architecture
 
-Synthetic investigation → verified evidence → reusable Selenium workflow.
-
-## Investigation and reuse
+## Target product: assist first, reuse for monitoring second
 
 ```mermaid
 flowchart TD
-    Goal["Goal + resource context"] --> Core["Investigation / guarded replay"]
-    Planner["Deterministic MockPlanner"] --> Core
-    Future["External LLM callback: not evaluated"] -.-> Core
-    Core --> Policy["Action, session, context and freshness guards"]
-    Policy --> Port["SeleniumPort: loopback mock contract"]
-    Port --> Driver["Explicit WebDriver + temporary profile"]
-    Driver --> Edge["Edge + msedgedriver: primary"]
-    Driver --> Chrome["Chrome + chromedriver: optional"]
-    Edge --> Mock["Synthetic observability UI"]
-    Chrome --> Mock
-    Mock --> Evidence["Typed observation + evidence verification"]
-    Evidence --> Trace["Diagnostic trace + query-contribution ablation"]
-    Trace --> Validate["Candidate skill + held-out fixture validation"]
-    Validate --> Registry["Versioned skill registry"]
-    Registry --> Replay["Generated static Selenium module / fresh-evidence replay"]
-    Replay --> Core
+    SRE["SRE visits Dynatrace pages / charts and uses shortcuts"] --> Observer["Consented browser observer"]
+    Observer --> Issue["Issue timeline: actions + visible page evidence + context"]
+    Issue --> Understand["Interpret pages, charts, filters and uncertainty"]
+    Understand --> Investigate["Bot chooses its own read-only investigation path"]
+    Investigate --> OwnBrowser["Separate bot browser: Edge primary / Chrome optional"]
+    OwnBrowser --> Fresh["Verify fresh page evidence and entity / time context"]
+    Fresh --> Conclusion["Supported conclusion to assist the SRE"]
+    Fresh --> Investigate
+
+    SRE --> Validated["SRE validates a useful chart check"]
+    Understand --> Validated
+    Validated --> BuildingBlock["Reusable chart / scope / expected-condition check"]
+    BuildingBlock --> Plan["Authorized release window + cadence + stop rule"]
+    Plan --> Monitor["Repeat the same check, e.g. every five minutes"]
+    Monitor --> OwnBrowser
+    Fresh --> Outcome["Healthy / failure / unknown + evidence"]
+    Outcome --> Reports["Deduplicated monitoring reports"]
+    Plan --> Stop["Stop at release end, explicit stop or session failure"]
 ```
 
-The driver factory requires existing executable paths: it does not download drivers, reuse personal profiles or disable sandboxing. `SeleniumPort` accepts only the local mock origin; it is not a Dynatrace/CloudWatch adapter. Page content is data, not executable instructions.
+This is the **required behavior**, not a diagram of already completed functionality. The semantic observer/issue/check/release contracts have a deterministic synthetic implementation below. Real browser observation, grounded model interpretation and browser-backed release monitoring remain implementation/acceptance work. An SRE's private reasoning is not observable; conclusions must be supported by page evidence or explicit annotations.
 
-## What each piece does
+## Implemented connected synthetic slice
 
-| Files | Responsibility |
+```mermaid
+flowchart LR
+    Input["Explicit synthetic consent + scoped semantic events"] --> Observer["SyntheticObserver: navigation / shortcut only"]
+    Observer --> Issue["Immutable issue timeline + typed ChartView"]
+    Issue --> Check["SRE validation + explicit maximum -> ChartCheck"]
+    Issue --> Interpret["Numeric page interpretation: NOT an LLM"]
+    Check --> Investigate["investigate_chart: choose alternate route"]
+    Interpret --> Investigate
+    Investigate --> Bot["Separate synthetic browser session"]
+    Bot --> Guard["Existing Policy + chart / label / filters / sample checks"]
+    Guard --> Result["Evidence-backed healthy / failure / unknown"]
+    Check --> Plan["ReleasePlan: start / end / 300-second cadence"]
+    Plan --> Tick["ReleaseMonitor.tick: injected clock, no scheduler"]
+    Tick --> Bot
+    Result --> Dedupe["Per-release state-transition dedupe + report flag"]
+    Tick --> Stop["End / explicit stop / expired session"]
+```
+
+`triage/chart_checks.py` reuses `core.Policy`, `Context` and the existing read-only `Action` allowlist. Typed chart evidence deliberately has no raw text, URL, keypress or credential field. The sample clock and capture clock must both be fresh; the exact entity, fixed time window, chart label, filters and UI contract must match. The baseline chooses an alternative dashboard/entity route rather than replaying the observer's actions. `examples/chart_release.py` uses an in-memory synthetic reader—not Selenium or model inference. The existing Selenium adapter below is retained but is **not wired to these new chart contracts yet**.
+
+| Added files | Responsibility |
 | --- | --- |
-| `triage/core.py` | Planner interface, policy, evidence verification, trace/skill lifecycle and static workflow export. |
-| `triage/selenium_port.py` | Read-only controls and explicit waits for the synthetic UI contract. |
-| `triage/browser_runtime.py` | Select Edge or Chrome; create an explicit Service and isolated browser options. |
-| `browser_probe.py` | Detect runtime availability; run the browser acceptance test and record blocked/pass/fail artifacts. |
-| `triage/mock_server.py`, `triage/fixtures.py` | Local UI and synthetic incidents; no real cloud connection. |
-| `triage/audit.py`, `triage/registry.py` | Query audit and versioned local skill storage. |
-| `triage/monitor.py`, `triage/weekend.py` | Synthetic resource sweep, dedupe and weekend-policy prototype; no installed scheduler or alert sender. |
-| `tests/`, `evaluate.py` | Regression tests, opt-in real-browser test and deterministic cold/reuse evaluation. |
+| `triage/chart_checks.py` | Consented semantic capture, issue/check contracts, alternate-route investigation and bounded release ticks. |
+| `tests/test_chart_checks.py` | Both synthetic journeys, privacy/action gates, freshness/context/drift/session/stop and failure/unknown/dedupe cases. |
+| `examples/chart_release.py` | Executable connected journey with fake timestamps; prints evidence JSON. |
+| `docs/REQUIREMENTS.md`, `docs/CHART_QA.md` | Product acceptance and honest executed/blocked evidence. |
 
-## Evidence boundary
+## Existing prototype
 
-**Executed:** 60 tests passed; one real-browser test skipped. Edge and Chrome constructor wiring uses real Selenium options/services with mocked launches.
+```mermaid
+flowchart LR
+    Planner["Deterministic MockPlanner / callback interface"] --> Core["Investigation + policy guards"]
+    Core --> Source["FixturePort or loopback SeleniumPort"]
+    Source --> Evidence["Synthetic evidence rules + trace"]
+    Evidence --> Skill["Held-out skill validation / fresh replay"]
+    Skill --> Core
+    Evidence --> Optional["Optional audit / registry / single-sweep monitor"]
+```
 
-**Not demonstrated:** real Edge/Chrome execution, Windows execution, actual LLM-led investigation, internal SSO or production monitoring. Both browser probes are blocked because binaries are missing. Model access for development/review is not an agent-inference benchmark.
+| Existing code | What it supplies—not an end-to-end acceptance claim |
+| --- | --- |
+| `triage/core.py` | Policy, planner callback, synthetic diagnosis, traces and validated workflow reuse. |
+| `triage/browser_runtime.py`, `browser_probe.py` | Explicit Edge/Chrome setup, isolated profiles and runtime acceptance reports. |
+| `triage/selenium_port.py`, `triage/mock_server.py`, `triage/fixtures.py` | Synthetic page contract and fixture evidence; no real Dynatrace adapter or SRE observer. |
+| `triage/audit.py`, `triage/registry.py` | Optional local audit and skill storage. |
+| `triage/monitor.py`, `triage/weekend.py` | Monitoring/dedupe primitives; no complete chart-derived release monitor or installed scheduler. |
+| `tests/`, `evaluate.py`, `run_demo.py` | Fixture regressions, opt-in browser tests and synthetic demonstrations. |
 
-Freshness and evidence checks are prototype rules over synthetic data, not production security certification. Known monitoring deadline/context defects and asynchronous-page limitations remain in the [README](../README.md). Runtime validation details: [EDGE_QA.md](../EDGE_QA.md).
+Current evidence: **73 tests passed, one real-browser test skipped**; 60/60 synthetic reuse pairs and healthy counterexamples correct. Actual Edge/Chrome/Windows, live-model page understanding, SSO and both complete user journeys remain unvalidated. Legacy monitor deadline/context and async-page limitations remain; see [chart QA](CHART_QA.md) and [browser QA](../EDGE_QA.md).
+
+Next work follows [acceptance requirements](REQUIREMENTS.md). No live recording, production monitoring or data egress is enabled by this documentation. The separate existing log-analysis tool is not reimplemented here.
