@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "intent": "investigate-lambda-failure",
+  "ui_version": "mock-v1",
+  "actions": [
+    {
+      "page": "overview",
+      "query": "invocation_health"
+    },
+    {
+      "page": "logs",
+      "query": "failure_events"
+    },
+    {
+      "page": "capacity",
+      "query": "throttling"
+    }
+  ],
+  "learned_from": "training-001",
+  "expected_failure": "likely-dependency-timeout",
+  "status": "validated",
+  "validated_on": [
+    "heldout-002"
+  ]
+}
