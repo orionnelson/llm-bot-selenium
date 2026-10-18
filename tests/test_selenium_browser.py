@@ -1,0 +1,68 @@
+"""Explicit opt-in real-browser integration; never download a driver implicitly."""
+import importlib.util
+import json
+import os
+from pathlib import Path
+import tempfile
+import threading
+import unittest
+from triage.core import (Context, MockPlanner, compile_skill, export_script,
+                         investigate, validate_skill)
+from triage.mock_server import make_server
+from triage.selenium_port import SeleniumPort
+
+
+READY = (bool(os.environ.get("CHROME_BINARY")) and bool(os.environ.get("CHROMEDRIVER"))
+         and importlib.util.find_spec("selenium") is not None)
+
+
+@unittest.skipUnless(READY, "NOT RUN: explicit Chrome binary, chromedriver and Selenium required")
+class SeleniumBrowserTests(unittest.TestCase):
+    def test_actual_browser_discover_learn_and_generated_script_reuse(self):
+        from selenium import webdriver
+        from selenium.webdriver.chrome.service import Service
+        server = make_server()
+        worker = threading.Thread(target=server.serve_forever, daemon=True)
+        worker.start()
+        options = webdriver.ChromeOptions()
+        options.binary_location = os.environ["CHROME_BINARY"]
+        options.add_argument("--headless=new")
+        options.add_argument("--disable-dev-shm-usage")
+        profile = tempfile.TemporaryDirectory(prefix="synthetic-chrome-profile-")
+        options.add_argument("--user-data-dir=" + profile.name)
+        driver = None
+        try:
+            driver = webdriver.Chrome(service=Service(os.environ["CHROMEDRIVER"]), options=options)
+            port = SeleniumPort(driver, "http://127.0.0.1:" + str(server.server_port))
+            ctx = Context("demo", "us-east-1", "checkout", 1, 2)
+            result = investigate(port, MockPlanner(), ctx, "browser-001", "Investigate")
+            self.assertEqual(result.result.failure, "likely-dependency-timeout")
+            skill, contribution = compile_skill(result)
+            heldout = Context("demo", "us-east-1", "payments", 3, 4)
+            validate_skill(skill, [(port, heldout, "browser-heldout-002", "likely-dependency-timeout")])
+            artifact = Path(os.environ.get("BROWSER_ARTIFACT_DIR", "artifacts/browser"))
+            artifact.mkdir(parents=True, exist_ok=True)
+            module_path = artifact / "generated_browser_skill.py"
+            export_script(skill, module_path)
+            spec = importlib.util.spec_from_file_location("generated_browser_skill", module_path)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            warm = module.run(driver, "http://127.0.0.1:" + str(server.server_port),
+                              Context("demo", "us-east-1", "orders", 5, 6), "browser-fresh-003")
+            self.assertEqual(warm.result.failure, result.result.failure)
+            self.assertEqual(warm.model_calls, 0)
+            self.assertLess(len(warm.observations), len(result.observations))
+            self.assertTrue(driver.save_screenshot(str(artifact / "synthetic-result.png")))
+            summary = {"status": "passed", "scope": "real browser, deterministic synthetic planner; no LLM/SSO",
+                       "browser_version": driver.capabilities.get("browserVersion"),
+                       "cold_reads": len(result.observations), "reused_reads": len(warm.observations),
+                       "reused_planner_calls": warm.model_calls, "finding": warm.result.failure,
+                       "query_contribution": contribution}
+            (artifact / "browser-summary.json").write_text(json.dumps(summary, indent=2) + "\n")
+        finally:
+            if driver:
+                driver.quit()
+            profile.cleanup()
+            server.shutdown()
+            server.server_close()
+            worker.join(timeout=2)

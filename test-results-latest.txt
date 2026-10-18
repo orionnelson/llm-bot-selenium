@@ -1,0 +1,57 @@
+test_audit_before_execution_and_verified_evidence (test_audit_registry.AuditRegistryTests.test_audit_before_execution_and_verified_evidence) ... ok
+test_audit_failure_prevents_query (test_audit_registry.AuditRegistryTests.test_audit_failure_prevents_query) ... ok
+test_audit_restart_continues_chain (test_audit_registry.AuditRegistryTests.test_audit_restart_continues_chain) ... ok
+test_registry_rejects_unvalidated (test_audit_registry.AuditRegistryTests.test_registry_rejects_unvalidated) ... ok
+test_registry_versions_and_integrity (test_audit_registry.AuditRegistryTests.test_registry_versions_and_integrity) ... ok
+test_tamper_detection (test_audit_registry.AuditRegistryTests.test_tamper_detection) ... ok
+test_trace_explanation_links_queries_hypotheses_and_ruleouts (test_audit_registry.AuditRegistryTests.test_trace_explanation_links_queries_hypotheses_and_ruleouts) ... ok
+test_missing_binaries_are_blocked_not_success (test_browser_probe.BrowserProbeTests.test_missing_binaries_are_blocked_not_success) ... ok
+test_missing_selenium_is_explicit (test_browser_probe.BrowserProbeTests.test_missing_selenium_is_explicit) ... ok
+test_present_executables_are_ready_not_tested (test_browser_probe.BrowserProbeTests.test_present_executables_are_ready_not_tested) ... ok
+test_bad_contexts (test_core.CoreTests.test_bad_contexts) ... ok
+test_budget_stops_unresolved (test_core.CoreTests.test_budget_stops_unresolved) ... ok
+test_candidate_cannot_be_reused (test_core.CoreTests.test_candidate_cannot_be_reused) ... ok
+test_compiler_removes_distraction_preserves_ruleout (test_core.CoreTests.test_compiler_removes_distraction_preserves_ruleout) ... ok
+test_duplicate_evidence_rejected (test_core.CoreTests.test_duplicate_evidence_rejected) ... ok
+test_export_candidate_refused (test_core.CoreTests.test_export_candidate_refused) ... ok
+test_export_is_importable_static_script_without_login (test_core.CoreTests.test_export_is_importable_static_script_without_login) ... ok
+test_failed_revalidation_demotes_previous_validated_skill (test_core.CoreTests.test_failed_revalidation_demotes_previous_validated_skill) ... ok
+test_failed_validation_does_not_promote (test_core.CoreTests.test_failed_validation_does_not_promote) ... ok
+test_failure_drift_cannot_reuse_previous_diagnosis (test_core.CoreTests.test_failure_drift_cannot_reuse_previous_diagnosis) ... ok
+test_injection_inside_facts_excluded_from_model_input (test_core.CoreTests.test_injection_inside_facts_excluded_from_model_input) ... ok
+test_invalid_numeric_evidence_not_healthy (test_core.CoreTests.test_invalid_numeric_evidence_not_healthy) ... ok
+test_layout_drift_falls_back_to_discovery (test_core.CoreTests.test_layout_drift_falls_back_to_discovery) ... ok
+test_mock_selenium_rejects_non_loopback_and_credentials (test_core.CoreTests.test_mock_selenium_rejects_non_loopback_and_credentials) ... ok
+test_model_cannot_issue_delete_or_shell (test_core.CoreTests.test_model_cannot_issue_delete_or_shell) ... ok
+test_monitor_bounded_parallelism_and_isolated_ports (test_core.CoreTests.test_monitor_bounded_parallelism_and_isolated_ports) ... ok
+test_monitor_bounds (test_core.CoreTests.test_monitor_bounds) ... ok
+test_monitor_isolates_failed_resource_and_deduplicates (test_core.CoreTests.test_monitor_isolates_failed_resource_and_deduplicates) ... ok
+test_monitor_recovery_then_recurrence_is_not_suppressed (test_core.CoreTests.test_monitor_recovery_then_recurrence_is_not_suppressed) ... ok
+test_page_injection_excluded_from_model_input (test_core.CoreTests.test_page_injection_excluded_from_model_input) ... ok
+test_repeated_action_is_bounded (test_core.CoreTests.test_repeated_action_is_bounded) ... ok
+test_seeded_diagnoses (test_core.CoreTests.test_seeded_diagnoses) ... ok
+test_session_expiry_does_not_trigger_rediscovery (test_core.CoreTests.test_session_expiry_does_not_trigger_rediscovery) ... ok
+test_stale_context_and_future_data_fail_closed (test_core.CoreTests.test_stale_context_and_future_data_fail_closed) ... ok
+test_trace_omits_untrusted_raw_page_text (test_core.CoreTests.test_trace_omits_untrusted_raw_page_text) ... ok
+test_training_case_is_not_heldout_validation (test_core.CoreTests.test_training_case_is_not_heldout_validation) ... ok
+test_unresolved_and_no_data_cannot_be_learned (test_core.CoreTests.test_unresolved_and_no_data_cannot_be_learned) ... ok
+test_warm_reuse_fresh_params_and_less_work (test_core.CoreTests.test_warm_reuse_fresh_params_and_less_work) ... ok
+test_zero_errors_alone_not_enough_to_report_no_failure (test_core.CoreTests.test_zero_errors_alone_not_enough_to_report_no_failure) ... ok
+test_zero_errors_or_invocations_do_not_hide_throttling (test_core.CoreTests.test_zero_errors_or_invocations_do_not_hide_throttling) ... ok
+test_seeded_cold_warm_and_counterexample_matrix (test_evaluation.EvaluationTests.test_seeded_cold_warm_and_counterexample_matrix) ... ok
+test_discovery_catalog_and_query_contract (test_mock_http.MockHTTPTests.test_discovery_catalog_and_query_contract) ... ok
+test_forbidden_mock_query_rejected (test_mock_http.MockHTTPTests.test_forbidden_mock_query_rejected) ... ok
+test_actual_browser_discover_learn_and_generated_script_reuse (test_selenium_browser.SeleniumBrowserTests.test_actual_browser_discover_learn_and_generated_script_reuse) ... skipped 'NOT RUN: explicit Chrome binary, chromedriver and Selenium required'
+test_expired_session_is_rejected_from_mock_ui_evidence (test_selenium_contract.SeleniumContractTests.test_expired_session_is_rejected_from_mock_ui_evidence) ... ok
+test_forbidden_action_rejected_by_adapter_before_navigation (test_selenium_contract.SeleniumContractTests.test_forbidden_action_rejected_by_adapter_before_navigation) ... ok
+test_selenium_adapter_contract_with_real_http_and_fake_dom (test_selenium_contract.SeleniumContractTests.test_selenium_adapter_contract_with_real_http_and_fake_dom) ... ok
+test_durable_dedupe_restart_ttl_recovery_and_recurrence (test_weekend.WeekendTests.test_durable_dedupe_restart_ttl_recovery_and_recurrence) ... ok
+test_monitor_restart_preserves_dedupe (test_weekend.WeekendTests.test_monitor_restart_preserves_dedupe) ... ok
+test_naive_timestamps_and_backwards_clock_rejected (test_weekend.WeekendTests.test_naive_timestamps_and_backwards_clock_rejected) ... ok
+test_weekend_and_interval_policy_without_live_scheduling (test_weekend.WeekendTests.test_weekend_and_interval_policy_without_live_scheduling) ... ok
+test_weekend_uses_selected_timezone_not_utc_weekday (test_weekend.WeekendTests.test_weekend_uses_selected_timezone_not_utc_weekday) ... ok
+
+----------------------------------------------------------------------
+Ran 52 tests in 2.673s
+
+OK (skipped=1)

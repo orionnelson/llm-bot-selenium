@@ -1,0 +1,88 @@
+[
+  {
+    "query": "tags",
+    "page": "inventory",
+    "evidence": "ev-checkout-tags",
+    "retained": false,
+    "method": "synthetic-oracle-greedy-ablation",
+    "hypothesis_before": "unresolved",
+    "hypothesis_after": "unresolved",
+    "ruled_out_after": [],
+    "role": "not-needed-by-synthetic-oracle",
+    "context": {
+      "account": "demo-account",
+      "region": "us-east-1",
+      "function": "checkout",
+      "start": 9000,
+      "end": 9900
+    },
+    "facts": {}
+  },
+  {
+    "query": "invocation_health",
+    "page": "overview",
+    "evidence": "ev-checkout-invocation_health",
+    "retained": true,
+    "method": "synthetic-oracle-greedy-ablation",
+    "hypothesis_before": "unresolved",
+    "hypothesis_after": "unresolved",
+    "ruled_out_after": [],
+    "role": "supporting-evidence",
+    "context": {
+      "account": "demo-account",
+      "region": "us-east-1",
+      "function": "checkout",
+      "start": 9000,
+      "end": 9900
+    },
+    "facts": {
+      "invocations": 100,
+      "errors": 12
+    }
+  },
+  {
+    "query": "failure_events",
+    "page": "logs",
+    "evidence": "ev-checkout-failure_events",
+    "retained": true,
+    "method": "synthetic-oracle-greedy-ablation",
+    "hypothesis_before": "unresolved",
+    "hypothesis_after": "unresolved",
+    "ruled_out_after": [],
+    "role": "supporting-evidence",
+    "context": {
+      "account": "demo-account",
+      "region": "us-east-1",
+      "function": "checkout",
+      "start": 9000,
+      "end": 9900
+    },
+    "facts": {
+      "event_code": "DEPENDENCY_TIMEOUT",
+      "correlated": true
+    }
+  },
+  {
+    "query": "throttling",
+    "page": "capacity",
+    "evidence": "ev-checkout-throttling",
+    "retained": true,
+    "method": "synthetic-oracle-greedy-ablation",
+    "hypothesis_before": "unresolved",
+    "hypothesis_after": "likely-dependency-timeout",
+    "ruled_out_after": [
+      "throttling"
+    ],
+    "role": "useful-rule-out",
+    "context": {
+      "account": "demo-account",
+      "region": "us-east-1",
+      "function": "checkout",
+      "start": 9000,
+      "end": 9900
+    },
+    "facts": {
+      "throttles": 0
+    }
+  }
+]
