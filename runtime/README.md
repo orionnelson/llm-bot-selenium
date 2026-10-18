@@ -53,3 +53,7 @@ Run in an isolated approved sandbox with no cloud credentials, no existing brows
 ## Exact unblock
 
 Provide either an approved prebuilt browser/Python test image/runtime attached to the OpenCode project, or approved DNS/HTTPS access to the configured package repositories plus a supported installation/runtime path. Rootless fetching alone does not install the required shared-library tree. Do not repeatedly retry unchanged DNS failures or silently modify the shared OpenCode image/configuration.
+
+## Microsoft Edge target
+
+Edge is the primary driver target. Supply an existing Edge binary and matching msedgedriver, then run `python browser_probe.py --browser edge --edge /path/to/msedge --driver /path/to/msedgedriver --run`. Environment equivalents: `SELENIUM_BROWSER=edge`, `MSEDGE_BINARY`, `MSEDGEDRIVER`. Selenium 4 is required. No automatic download, personal profile reuse, or sandbox bypass. The Dockerfile here remains an optional Chromium-only recipe, not an Edge image. See the root README for Windows and Chrome commands.

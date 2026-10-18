@@ -24,19 +24,33 @@ python3 run_demo.py --output artifacts/demo
 python3 -m triage.mock_server
 ```
 
-Real-browser integration is opt-in. Install `requirements.lock` into a project-local virtualenv (never system pip), provide an existing Chrome and matching chromedriver, then:
+## Browser target: Microsoft Edge
+
+Use **Edge + matching `msedgedriver`** (Selenium 4). Install `requirements.lock` in a virtualenv and supply executable paths; the project never downloads browsers/drivers automatically.
 
 ```sh
-CHROME_BINARY=/approved/path/chrome CHROMEDRIVER=/approved/path/chromedriver \
-  .venv/bin/python -m unittest discover -s tests -p test_selenium_browser.py -v
+python browser_probe.py --browser edge --edge /path/to/msedge --driver /path/to/msedgedriver --run
 ```
 
-For an explicit blocked/pass/fail report, run `python browser_probe.py --run`.
-OpenCode runtime attempt, exact DNS blocker, non-root test-image recipe and
-discovery-to-generated-script browser acceptance are documented in
-[`runtime/README.md`](runtime/README.md). The image recipe is **not built/tested**.
+Windows PowerShell:
 
-No browser binary was found at initial inspection. A skipped integration test is **NOT RUN**, not a browser pass. `requirements.lock` records the actual Python dependency versions installed for this prototype. Browser binaries must be separately versioned and staged before an offline test; do not rely on Selenium Manager fetching implicitly.
+```powershell
+python browser_probe.py --browser edge --edge "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --driver "C:\tools\msedgedriver.exe" --run
+```
+
+Alternatively set `SELENIUM_BROWSER=edge`, `MSEDGE_BINARY`, and `MSEDGEDRIVER` before running the browser test. Edge is the default; direct test execution requires explicit environment paths.
+
+**Chrome remains supported:**
+
+```sh
+python browser_probe.py --browser chrome --chrome /path/to/chrome --driver /path/to/chromedriver --run
+```
+
+The original `CHROME_BINARY` + `CHROMEDRIVER` setup still selects Chrome unless `SELENIUM_BROWSER` overrides it.
+
+The probe writes runtime status, logs, and—on genuine browser success—a screenshot and browser/version summary under `artifacts/browser`. Ready executable checks and mocked constructor tests are **not** real-browser passes. No Edge/Chrome binaries are available in the current environment; the real-browser test is skipped.
+
+Runs use temporary profiles, keep sandboxing enabled, and target only the synthetic loopback UI. The [runtime image recipe](runtime/README.md) remains **Chromium-only** and unbuilt, not an Edge installation recipe.
 
 ## Learning demonstration
 
