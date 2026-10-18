@@ -2,6 +2,23 @@
 
 **Research harness, not production-ready automation.** No internal Dynatrace/AWS access, credentials, real SSO, deployment or cloud changes. The initial Zen model could not reach its upstream; Blue authored this implementation. OpenCode now successfully uses ChatGPT OAuth with `openai/gpt-6.1-sol` for project inspection/review. That model access is distinct from evaluating the browser agent itself. See `test-results.md` for validation boundaries.
 
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Goal["Goal + context"] --> Guard["Planner + policy guards"]
+    Guard --> Adapter["Selenium adapter"]
+    Adapter --> Driver["Edge/msedgedriver or Chrome/chromedriver"]
+    Driver --> UI["Local synthetic UI"]
+    UI --> Verify["Verify evidence"]
+    Verify --> Learn["Validate + store reusable skill"]
+    Learn --> Replay["Replay with fresh evidence"]
+    Replay --> Guard
+```
+
+The current planner is deterministic; external LLM callbacks are not yet evaluated. Real browser execution is still blocked. See the [architecture walkthrough](docs/ARCHITECTURE.md) for components and validation boundaries.
+
 ## What exists
 
 - `triage/core.py`: independent action/context/freshness/session policy, structured planner callback, deterministic test planner, evidence verifier, diagnostic trace, query-contribution ablation, candidate/validated skill lifecycle, replay and drift fallback, static Selenium script exporter.
@@ -24,19 +41,33 @@ python3 run_demo.py --output artifacts/demo
 python3 -m triage.mock_server
 ```
 
-Real-browser integration is opt-in. Install `requirements.lock` into a project-local virtualenv (never system pip), provide an existing Chrome and matching chromedriver, then:
+## Browser target: Microsoft Edge
+
+Use **Edge + matching `msedgedriver`** (Selenium 4). Install `requirements.lock` in a virtualenv and supply executable paths; the project never downloads browsers/drivers automatically.
 
 ```sh
-CHROME_BINARY=/approved/path/chrome CHROMEDRIVER=/approved/path/chromedriver \
-  .venv/bin/python -m unittest discover -s tests -p test_selenium_browser.py -v
+python browser_probe.py --browser edge --edge /path/to/msedge --driver /path/to/msedgedriver --run
 ```
 
-For an explicit blocked/pass/fail report, run `python browser_probe.py --run`.
-OpenCode runtime attempt, exact DNS blocker, non-root test-image recipe and
-discovery-to-generated-script browser acceptance are documented in
-[`runtime/README.md`](runtime/README.md). The image recipe is **not built/tested**.
+Windows PowerShell:
 
-No browser binary was found at initial inspection. A skipped integration test is **NOT RUN**, not a browser pass. `requirements.lock` records the actual Python dependency versions installed for this prototype. Browser binaries must be separately versioned and staged before an offline test; do not rely on Selenium Manager fetching implicitly.
+```powershell
+python browser_probe.py --browser edge --edge "C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe" --driver "C:\tools\msedgedriver.exe" --run
+```
+
+Alternatively set `SELENIUM_BROWSER=edge`, `MSEDGE_BINARY`, and `MSEDGEDRIVER` before running the browser test. Edge is the default; direct test execution requires explicit environment paths.
+
+**Chrome remains supported:**
+
+```sh
+python browser_probe.py --browser chrome --chrome /path/to/chrome --driver /path/to/chromedriver --run
+```
+
+The original `CHROME_BINARY` + `CHROMEDRIVER` setup still selects Chrome unless `SELENIUM_BROWSER` overrides it.
+
+The probe writes runtime status, logs, and—on genuine browser success—a screenshot and browser/version summary under `artifacts/browser`. Ready executable checks and mocked constructor tests are **not** real-browser passes. No Edge/Chrome binaries are available in the current environment; the real-browser test is skipped.
+
+Runs use temporary profiles, keep sandboxing enabled, and target only the synthetic loopback UI. See [runtime setup](runtime/README.md). Container packaging is deferred; the unused Chromium-only recipe was removed.
 
 ## Learning demonstration
 

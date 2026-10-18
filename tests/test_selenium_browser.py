@@ -9,30 +9,26 @@ import unittest
 from triage.core import (Context, MockPlanner, compile_skill, export_script,
                          investigate, validate_skill)
 from triage.mock_server import make_server
+from triage.browser_runtime import selected_browser, create_driver, BROWSER_ENV
 from triage.selenium_port import SeleniumPort
 
 
-READY = (bool(os.environ.get("CHROME_BINARY")) and bool(os.environ.get("CHROMEDRIVER"))
+BROWSER = selected_browser()
+BINARY_ENV, DRIVER_ENV = BROWSER_ENV[BROWSER]
+READY = (bool(os.environ.get(BINARY_ENV)) and bool(os.environ.get(DRIVER_ENV))
          and importlib.util.find_spec("selenium") is not None)
 
 
-@unittest.skipUnless(READY, "NOT RUN: explicit Chrome binary, chromedriver and Selenium required")
+@unittest.skipUnless(READY, "NOT RUN: explicit browser binary, matching driver and Selenium required")
 class SeleniumBrowserTests(unittest.TestCase):
     def test_actual_browser_discover_learn_and_generated_script_reuse(self):
-        from selenium import webdriver
-        from selenium.webdriver.chrome.service import Service
         server = make_server()
         worker = threading.Thread(target=server.serve_forever, daemon=True)
         worker.start()
-        options = webdriver.ChromeOptions()
-        options.binary_location = os.environ["CHROME_BINARY"]
-        options.add_argument("--headless=new")
-        options.add_argument("--disable-dev-shm-usage")
-        profile = tempfile.TemporaryDirectory(prefix="synthetic-chrome-profile-")
-        options.add_argument("--user-data-dir=" + profile.name)
+        profile = tempfile.TemporaryDirectory(prefix="synthetic-" + BROWSER + "-profile-")
         driver = None
         try:
-            driver = webdriver.Chrome(service=Service(os.environ["CHROMEDRIVER"]), options=options)
+            driver = create_driver(BROWSER, os.environ[BINARY_ENV], os.environ[DRIVER_ENV], profile.name)
             port = SeleniumPort(driver, "http://127.0.0.1:" + str(server.server_port))
             ctx = Context("demo", "us-east-1", "checkout", 1, 2)
             result = investigate(port, MockPlanner(), ctx, "browser-001", "Investigate")
@@ -54,6 +50,7 @@ class SeleniumBrowserTests(unittest.TestCase):
             self.assertLess(len(warm.observations), len(result.observations))
             self.assertTrue(driver.save_screenshot(str(artifact / "synthetic-result.png")))
             summary = {"status": "passed", "scope": "real browser, deterministic synthetic planner; no LLM/SSO",
+                       "browser": BROWSER,
                        "browser_version": driver.capabilities.get("browserVersion"),
                        "cold_reads": len(result.observations), "reused_reads": len(warm.observations),
                        "reused_planner_calls": warm.model_calls, "finding": warm.result.failure,

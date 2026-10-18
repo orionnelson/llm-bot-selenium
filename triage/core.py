@@ -11,7 +11,6 @@ import hashlib
 import json
 import math
 import re
-from typing import Protocol
 
 
 class GuardError(ValueError):
@@ -91,16 +90,6 @@ class Trace:
     notes: list[str] = field(default_factory=list)
 
 
-class Port(Protocol):
-    def version(self) -> str: ...
-    def catalog(self) -> list[dict]: ...
-    def observe(self, action: Action, context: Context) -> Observation: ...
-
-
-class Planner(Protocol):
-    def choose(self, goal: str, catalog: list[dict], history: list[Observation]) -> Action | None: ...
-
-
 class Policy:
     def __init__(self, context: Context, *, max_age=300, now=None):
         context.check()
@@ -164,12 +153,10 @@ def diagnose(observations: list[Observation]) -> Diagnosis:
         return Diagnosis("no-data", [health.evidence_id, throttle.evidence_id], confidence="cannot-infer-health")
     if errors == 0:
         return Diagnosis("no-failure-observed", [health.evidence_id, throttle.evidence_id], confidence="observed-error-and-throttle-window-only")
-    ruled = []
-    if throttle and _number(throttle.facts, "throttles") == 0:
-        ruled.append("throttling")
+    # Earlier branches return unless throttles is valid and zero.
+    ruled = ["throttling"]
     if logs and logs.facts.get("event_code") == "DEPENDENCY_TIMEOUT" and logs.facts.get("correlated") is True:
-        if throttle and "throttling" in ruled:
-            return Diagnosis("likely-dependency-timeout", [health.evidence_id, logs.evidence_id, throttle.evidence_id], ruled)
+        return Diagnosis("likely-dependency-timeout", [health.evidence_id, logs.evidence_id, throttle.evidence_id], ruled)
     if duration:
         p99, limit = _number(duration.facts, "p99_ms"), _number(duration.facts, "timeout_ms")
         if p99 is not None and limit and p99 >= limit and logs and logs.facts.get("event_code") == "FUNCTION_TIMEOUT":
@@ -234,7 +221,7 @@ def model_facts(observation):
     return facts
 
 
-def investigate(port: Port, planner: Planner, context: Context, incident: str,
+def investigate(port, planner, context: Context, incident: str,
                 goal: str, *, now=None, budget=8, audit=None) -> Trace:
     if type(budget) is not int or not 1 <= budget <= 30:
         raise GuardError("invalid investigation budget")
@@ -264,7 +251,7 @@ def investigate(port: Port, planner: Planner, context: Context, incident: str,
         if audit:
             audit.record("verified-read", {"evidence": obs.evidence_id, "query": action.query, "facts": model_facts(obs)})
         result = diagnose(observations)
-        if result.failure not in ("unresolved",):
+        if result.failure != "unresolved":
             break
     return Trace(incident, context, version, observations, diagnose(observations), calls)
 
@@ -327,7 +314,7 @@ def compile_skill(trace: Trace) -> tuple[Skill, list[dict]]:
     return skill, contribution
 
 
-def replay(skill: Skill, port: Port, context: Context, incident: str, *, now=None,
+def replay(skill: Skill, port, context: Context, incident: str, *, now=None,
            candidate_validation=False, audit=None) -> Trace:
     if skill.schema != 1 or not skill.actions or len(skill.actions) > 30:
         raise GuardError("invalid skill schema or action count")
@@ -358,7 +345,7 @@ def replay(skill: Skill, port: Port, context: Context, incident: str, *, now=Non
     return Trace(incident, context, skill.ui_version, observations, result, 0, "learned-replay")
 
 
-def validate_skill(skill: Skill, cases: list[tuple[Port, Context, str, str]], *, now=None):
+def validate_skill(skill: Skill, cases, *, now=None):
     # Failed revalidation must not leave a previously validated skill reusable.
     skill.status = "candidate"
     skill.validated_on = []
