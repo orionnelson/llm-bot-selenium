@@ -33,17 +33,13 @@ class FixturePort:
             values["invocation_health"]["errors"] = 0
         elif self.failure == "no-data":
             values["invocation_health"] = {"invocations": 0, "errors": 0}
-        elif self.failure == "throttling":
+        elif self.failure in ("throttling", "throttled-no-errors", "all-throttled"):
             values["throttling"]["throttles"] = 30
             values["failure_events"] = {"event_code": "THROTTLED", "correlated": False}
-        elif self.failure == "throttled-no-errors":
-            values["invocation_health"]["errors"] = 0
-            values["throttling"]["throttles"] = 30
-            values["failure_events"] = {"event_code": "THROTTLED", "correlated": False}
-        elif self.failure == "all-throttled":
-            values["invocation_health"] = {"invocations": 0, "errors": 0}
-            values["throttling"]["throttles"] = 30
-            values["failure_events"] = {"event_code": "THROTTLED", "correlated": False}
+            if self.failure != "throttling":
+                values["invocation_health"]["errors"] = 0
+            if self.failure == "all-throttled":
+                values["invocation_health"]["invocations"] = 0
         elif self.failure == "timeout":
             values["failure_events"] = {"event_code": "FUNCTION_TIMEOUT", "correlated": True}
             values["duration"]["p99_ms"] = 3000
