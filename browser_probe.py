@@ -7,7 +7,6 @@ import importlib.util
 import json
 import os
 from pathlib import Path
-import shutil
 import signal
 import subprocess
 import sys
@@ -15,15 +14,18 @@ import tempfile
 
 
 def inspect_runtime(chrome=None, driver=None, *, browser=None, edge=None):
-    from triage.browser_runtime import selected_browser, runtime_paths
-    browser = selected_browser(browser or ('chrome' if chrome else None))
+    from triage.browser_runtime import (selected_browser, runtime_paths, browser_spec,
+                                       is_executable)
+    if (chrome and edge) or (browser == 'edge' and chrome) or (browser == 'chrome' and edge):
+        raise ValueError('Browser and binary options disagree')
+    browser = selected_browser(browser or ('chrome' if chrome else 'edge' if edge else None))
     binary, driver = runtime_paths(browser, edge if browser == 'edge' else chrome, driver)
-    labels = ('edge', 'msedgedriver') if browser == 'edge' else ('chrome', 'chromedriver')
+    labels = (browser, browser_spec(browser).driver_name)
     missing = []
     if importlib.util.find_spec("selenium") is None:
         missing.append("selenium-package")
     for label, value in zip(labels, (binary, driver)):
-        if not value or not Path(value).is_file() or not os.access(value, os.X_OK):
+        if not is_executable(value):
             missing.append(label)
     return {"status": "blocked" if missing else "ready-not-run", "missing": missing,
             "browser": browser, "binary": binary, "driver": driver,
@@ -51,13 +53,12 @@ def main():
     parser.add_argument("--run", action="store_true")
     parser.add_argument("--output", default="artifacts/browser")
     args = parser.parse_args()
+    try:
+        report = inspect_runtime(args.chrome, args.driver, browser=args.browser, edge=args.edge)
+    except ValueError as exc:
+        parser.error(str(exc))
     output = Path(args.output).resolve()
     output.mkdir(parents=True, exist_ok=True)
-    if args.edge and args.chrome:
-        parser.error("Choose only one browser binary")
-    if (args.browser == "edge" and args.chrome) or (args.browser == "chrome" and args.edge):
-        parser.error("Browser and binary option disagree")
-    report = inspect_runtime(args.chrome, args.driver, browser=args.browser or ("edge" if args.edge else None), edge=args.edge)
     exit_code = 2 if report["missing"] else 0
     if args.run and not report["missing"]:
         # Do not pass ambient cloud credentials/tokens into the synthetic test.
@@ -65,12 +66,10 @@ def main():
                ("PATH", "LANG", "LC_ALL", "TZ", "LD_LIBRARY_PATH", "PYTHONHOME", "VIRTUAL_ENV",
                 "SYSTEMROOT", "SystemRoot", "WINDIR", "COMSPEC", "PATHEXT", "TEMP", "TMP")}
         with tempfile.TemporaryDirectory(prefix="triage-test-home-") as home:
+            from triage.browser_runtime import runtime_environment
             env.update(HOME=home, USERPROFILE=home, LOCALAPPDATA=home,
-                       SELENIUM_BROWSER=report["browser"], BROWSER_ARTIFACT_DIR=str(output))
-            if report["browser"] == "edge":
-                env.update(MSEDGE_BINARY=report["binary"], MSEDGEDRIVER=report["driver"])
-            else:
-                env.update(CHROME_BINARY=report["binary"], CHROMEDRIVER=report["driver"])
+                       BROWSER_ARTIFACT_DIR=str(output))
+            env.update(runtime_environment(report["browser"], report["binary"], report["driver"]))
             process = subprocess.Popen([sys.executable, "-m", "unittest", "discover", "-s", "tests",
                                         "-p", "test_selenium_browser.py", "-v"],
                                        cwd=Path(__file__).resolve().parent, env=env,
@@ -79,7 +78,6 @@ def main():
                                        creationflags=subprocess.CREATE_NEW_PROCESS_GROUP if os.name == "nt" else 0)
             try:
                 stdout, stderr = process.communicate(timeout=120)
-                (output / "browser-test.log").write_text(stdout + stderr)
                 exit_code = process.returncode
                 report["status"] = "passed" if exit_code == 0 and "skipped" not in stderr.lower() else "failed"
                 if report["status"] == "failed" and exit_code == 0:
@@ -93,9 +91,9 @@ def main():
                 except subprocess.TimeoutExpired:
                     stop_process_tree(process, force=True)
                     stdout, stderr = process.communicate()
-                (output / "browser-test.log").write_text(stdout + stderr)
                 report["status"] = "failed-timeout"
                 exit_code = 1
+            (output / "browser-test.log").write_text(stdout + stderr)
     (output / "runtime-report.json").write_text(json.dumps(report, indent=2) + "\n")
     print(json.dumps(report, indent=2))
     return exit_code

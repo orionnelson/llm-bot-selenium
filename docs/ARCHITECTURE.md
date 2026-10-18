@@ -41,7 +41,7 @@ The driver factory requires existing executable paths: it does not download driv
 
 ## Evidence boundary
 
-**Executed:** 57 tests passed; one real-browser test skipped. Edge and Chrome constructor wiring uses real Selenium options/services with mocked launches.
+**Executed:** 61 tests passed; one real-browser test skipped. Edge and Chrome constructor wiring uses real Selenium options/services with mocked launches.
 
 **Not demonstrated:** real Edge/Chrome execution, Windows execution, actual LLM-led investigation, internal SSO or production monitoring. Both browser probes are blocked because binaries are missing. Model access for development/review is not an agent-inference benchmark.
 

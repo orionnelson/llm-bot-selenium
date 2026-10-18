@@ -9,13 +9,13 @@ import unittest
 from triage.core import (Context, MockPlanner, compile_skill, export_script,
                          investigate, validate_skill)
 from triage.mock_server import make_server
-from triage.browser_runtime import selected_browser, create_driver
+from triage.browser_runtime import selected_browser, create_driver, browser_spec
 from triage.selenium_port import SeleniumPort
 
 
 BROWSER = selected_browser()
-BINARY_ENV, DRIVER_ENV = (("MSEDGE_BINARY", "MSEDGEDRIVER") if BROWSER == "edge"
-                          else ("CHROME_BINARY", "CHROMEDRIVER"))
+SPEC = browser_spec(BROWSER)
+BINARY_ENV, DRIVER_ENV = SPEC.binary_env, SPEC.driver_env
 READY = (bool(os.environ.get(BINARY_ENV)) and bool(os.environ.get(DRIVER_ENV))
          and importlib.util.find_spec("selenium") is not None)
 
