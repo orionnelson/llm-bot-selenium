@@ -2,6 +2,23 @@
 
 **Research harness, not production-ready automation.** No internal Dynatrace/AWS access, credentials, real SSO, deployment or cloud changes. The initial Zen model could not reach its upstream; Blue authored this implementation. OpenCode now successfully uses ChatGPT OAuth with `openai/gpt-6.1-sol` for project inspection/review. That model access is distinct from evaluating the browser agent itself. See `test-results.md` for validation boundaries.
 
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Goal["Goal + context"] --> Guard["Planner + policy guards"]
+    Guard --> Adapter["Selenium adapter"]
+    Adapter --> Driver["Edge/msedgedriver or Chrome/chromedriver"]
+    Driver --> UI["Local synthetic UI"]
+    UI --> Verify["Verify evidence"]
+    Verify --> Learn["Validate + store reusable skill"]
+    Learn --> Replay["Replay with fresh evidence"]
+    Replay --> Guard
+```
+
+The current planner is deterministic; external LLM callbacks are not yet evaluated. Real browser execution is still blocked. See the [architecture walkthrough](docs/ARCHITECTURE.md) for components and validation boundaries.
+
 ## What exists
 
 - `triage/core.py`: independent action/context/freshness/session policy, structured planner callback, deterministic test planner, evidence verifier, diagnostic trace, query-contribution ablation, candidate/validated skill lifecycle, replay and drift fallback, static Selenium script exporter.
