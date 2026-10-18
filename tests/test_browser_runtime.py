@@ -56,3 +56,18 @@ class BrowserRuntimeTests(unittest.TestCase):
     def test_missing_paths_rejected_before_selenium_can_download(self):
         with self.assertRaises(ValueError):
             create_driver('edge', '/missing/edge', '/missing/msedgedriver', '/tmp/profile')
+
+    def test_explicit_edge_binary_overrides_ambient_chrome_selection(self):
+        with patch.dict(os.environ, {'CHROME_BINARY': '/ambient/chrome'}, clear=True):
+            report = inspect_runtime(edge='/missing/edge', driver='/missing/msedgedriver')
+        self.assertEqual(report['browser'], 'edge')
+
+    def test_conflicting_binary_hints_are_rejected(self):
+        with self.assertRaises(ValueError):
+            inspect_runtime(chrome='/chrome', edge='/edge')
+
+    def test_relative_paths_are_resolved_before_subprocess_changes_cwd(self):
+        from triage.browser_runtime import runtime_paths
+        binary, driver = runtime_paths('edge', 'relative/msedge', 'relative/msedgedriver')
+        self.assertEqual(binary, str(Path('relative/msedge').resolve()))
+        self.assertEqual(driver, str(Path('relative/msedgedriver').resolve()))

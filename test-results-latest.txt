@@ -8,12 +8,15 @@ test_trace_explanation_links_queries_hypotheses_and_ruleouts (test_audit_registr
 test_missing_binaries_are_blocked_not_success (test_browser_probe.BrowserProbeTests.test_missing_binaries_are_blocked_not_success) ... ok
 test_missing_selenium_is_explicit (test_browser_probe.BrowserProbeTests.test_missing_selenium_is_explicit) ... ok
 test_present_executables_are_ready_not_tested (test_browser_probe.BrowserProbeTests.test_present_executables_are_ready_not_tested) ... ok
+test_conflicting_binary_hints_are_rejected (test_browser_runtime.BrowserRuntimeTests.test_conflicting_binary_hints_are_rejected) ... ok
 test_default_is_edge (test_browser_runtime.BrowserRuntimeTests.test_default_is_edge) ... ok
 test_each_driver_receives_explicit_service_binary_and_fresh_profile (test_browser_runtime.BrowserRuntimeTests.test_each_driver_receives_explicit_service_binary_and_fresh_profile) ... ok
 test_edge_missing_is_not_browser_success (test_browser_runtime.BrowserRuntimeTests.test_edge_missing_is_not_browser_success) ... ok
+test_explicit_edge_binary_overrides_ambient_chrome_selection (test_browser_runtime.BrowserRuntimeTests.test_explicit_edge_binary_overrides_ambient_chrome_selection) ... ok
 test_invalid_browser_rejected (test_browser_runtime.BrowserRuntimeTests.test_invalid_browser_rejected) ... ok
 test_missing_paths_rejected_before_selenium_can_download (test_browser_runtime.BrowserRuntimeTests.test_missing_paths_rejected_before_selenium_can_download) ... ok
 test_original_chrome_environment_still_selects_chrome (test_browser_runtime.BrowserRuntimeTests.test_original_chrome_environment_still_selects_chrome) ... ok
+test_relative_paths_are_resolved_before_subprocess_changes_cwd (test_browser_runtime.BrowserRuntimeTests.test_relative_paths_are_resolved_before_subprocess_changes_cwd) ... ok
 test_bad_contexts (test_core.CoreTests.test_bad_contexts) ... ok
 test_budget_stops_unresolved (test_core.CoreTests.test_budget_stops_unresolved) ... ok
 test_candidate_cannot_be_reused (test_core.CoreTests.test_candidate_cannot_be_reused) ... ok
@@ -58,6 +61,6 @@ test_weekend_and_interval_policy_without_live_scheduling (test_weekend.WeekendTe
 test_weekend_uses_selected_timezone_not_utc_weekday (test_weekend.WeekendTests.test_weekend_uses_selected_timezone_not_utc_weekday) ... ok
 
 ----------------------------------------------------------------------
-Ran 58 tests in 2.659s
+Ran 61 tests in 2.652s
 
 OK (skipped=1)
