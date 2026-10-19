@@ -26,7 +26,7 @@ flowchart LR
 
 - `ui/src/workflow.ts`: shared URL validation and sensitive-name rule, extended for signature queries.
 - `ui/src/snippets.ts`: removes duplicate parser; routes session URLs, event URLs and saved snippet templates through the existing guard.
-- `ui/src/control-snippets-layout.test.ts`: eight new table-driven cases across session import, event clipping and library/per-node persistence; existing token assertion checks the semantic query value instead of one encoding spelling.
+- `ui/src/control-snippets-layout.test.ts`: eight new table-driven cases plus a raw-length compatibility assertion across session import, event clipping and library/per-node persistence; existing token assertion checks the semantic query value instead of one encoding spelling.
 - `ui/src/workflow.test.ts`: page-seed signed-query redaction and rejection of sensitive placeholder names.
 - `.github/workflows/tests.yml`: adds `studio-tests` (Node22, Python3.11, lockfile install including dev dependencies, unit tests and production build). Python `synthetic-tests` is retained. No production execution or deployment.
 
@@ -35,7 +35,7 @@ flowchart LR
 Fresh source fetched from remote `blue-master` at `1c6e95fc82a5f72ce5fea9655f18261731a15898`; not an old local Studio snapshot. Existing OpenCode author status was idle (`{}`), and its saved implementation response was completed. No new authoring session or overwrite of the held PR11 workspace.
 
 - Before fix: **7 failing / 97 passing** frontend tests (104 total); signed-query seed test added afterward.
-- After fix: `cd ui && npm test`: **105 passed, 0 failed**.
+- After fix: `cd ui && npm test`: **106 passed, 0 failed**.
 - `cd ui && npm run build`: TypeScript and Vite PASS. Existing bundle-size advisories remain (main ~527KB, optional ELK ~1.44MB).
 - `../demo/.venv/bin/python -m unittest discover -s tests -v`: **99 run, 97 passed, 2 actual-browser skipped**.
 - `../demo/.venv/bin/python evaluate.py`: **60/60** deterministic diagnosis pairs and **60/60** healthy counterexamples.
