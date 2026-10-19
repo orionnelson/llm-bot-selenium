@@ -152,3 +152,14 @@ Minimal import shape:
 All five boundaries now resize independently: library/canvas, canvas/right pane, canvas/inspector, browser/debugger, debugger/history. Splitters have visible grips, pointer capture, touch cancellation, keyboard arrows (Shift for larger steps), double-click/Home reset, minimum sizes and persisted dimensions. The canvas toolbar can restore a collapsed inspector or reset the whole layout. Saved layouts from the previous version migrate with defaults for new dividers.
 
 New implementation files: `control.ts`, `ControlFlowEditor.tsx`, `snippets.ts`, `TriageDesigner.tsx`, `layout.ts`, `Splitter.tsx`. Tests include bounded loops and scoped branch variables, malformed returns/cycles, snippet sanitization/range/persistence, pane math, and actual server-rendered component markup. SSR is not a screenshot or browser-pointer acceptance test.
+
+
+## Python-first itemized DAG (current functional interface)
+
+Open **Task DAG** for each selected item, or **DAG** in the canvas toolbar for the complete definition. The primary Py export now emits `DAG(tasks=(Task(...), ...))` using `triage.dag` dataclasses and stdlib `graphlib.TopologicalSorter`, rather than unrelated function definitions. Every action, branch, loop, Continue marker and snippet has a task item. Loop bodies are scoped subgraphs; Repeat is control metadata, never a cyclic dependency.
+
+**Save** writes a Python functional artifact, separate JSON layout, and the legacy editable template cache locally. Incomplete drafts still save without overwriting the previous valid Python DAG. Export the `.py` and layout files independently, or use a DAG bundle for transport. Existing Import accepts `sre-dag/v1`, bundles, separate `sre-layout/v1` files and legacy templates. JSON is used for layout/templates and the Python-model transport/cache, not as a separate execution language.
+
+Hand-edit the Python definition, convert it with `python -m triage.dag workflow_dag.py --format spec --output workflow.dag.json`, then import that spec and optional layout. The loader accepts only literal constructors and never executes submitted code. Full [typed-model and CLI guide](../docs/PYTHON_DAG.md), including limitations and existing-framework rationale.
+
+The top-right header now reserves independent columns for tabs, DEMO/REPLAY and maximize; tabs scroll inside their own area. React Flow explicitly fills all four canvas edges and the center track can shrink without leaving a stale right-side gap.95frontendtests and95Pythonpassed/2browser-skipped; visual browser acceptance remains blocked, not claimed.

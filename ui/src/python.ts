@@ -1,10 +1,10 @@
 import { validateLoop } from './control';
 import type { FlowNode } from './sre';
 export type Operator='>'|'>='|'<'|'<='|'=='|'!=';
-export interface Condition { input:string; operator:Operator; threshold:number; sample:number }
+export interface Condition { input:string; operator:Operator; threshold:number; sample:number; source?:'input'|'lambda-errors' }
 export interface PythonCode { source:string; origin:'starter'|'user'|'llm'; review:'pending'|'approved'; model?:string }
 export const defaultCondition:Condition={input:'i',operator:'>',threshold:3,sample:5};
-export function checkCondition(c:Condition){if(!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(c.input)||['True','False','None','class','def','if','else','for','import','return','lambda','in','is','not','and','or','while','try','with','async','await','yield','del','from','global','nonlocal','pass','raise','assert','break','continue','except','finally','as','elif'].includes(c.input)||!['>','>=','<','<=','==','!='].includes(c.operator)||!Number.isFinite(c.threshold)||!Number.isFinite(c.sample))throw Error('Condition requires a Python input name, supported comparison and finite numeric values');}
+export function checkCondition(c:Condition){if((c.source!==undefined&&!['input','lambda-errors'].includes(c.source))||!/^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(c.input)||['True','False','None','class','def','if','else','for','import','return','lambda','in','is','not','and','or','while','try','with','async','await','yield','del','from','global','nonlocal','pass','raise','assert','break','continue','except','finally','as','elif'].includes(c.input)||!['>','>=','<','<=','==','!='].includes(c.operator)||!Number.isFinite(c.threshold)||!Number.isFinite(c.sample))throw Error('Condition requires a Python input name, supported comparison and finite numeric values');}
 export function evaluateCondition(c:Condition,value:number){checkCondition(c);switch(c.operator){case '>':return value>c.threshold;case '>=':return value>=c.threshold;case '<':return value<c.threshold;case '<=':return value<=c.threshold;case '==':return value===c.threshold;case '!=':return value!==c.threshold;}}
 export function starterPython(n:FlowNode):string {
  const c=n.data.config;
