@@ -174,6 +174,34 @@ class ChartJourneyTests(unittest.TestCase):
         self.assertEqual(result['state'], 'unknown')
         self.assertEqual(len(bot.reads), 2)
 
+    def test_nonconsecutive_evidence_replay_is_unknown_across_release(self):
+        # All samples are still fresh: freshness alone cannot detect A -> B -> A.
+        monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 110, cadence=1))
+        bot = FakeBrowser(self.view)
+        for now, evidence, expected in [(100, 'check-a', 'healthy'),
+                                         (101, 'check-b', 'healthy'),
+                                         (102, 'check-a', 'unknown'),
+                                         (103, 'check-c', 'healthy'),
+                                         (104, 'observed-1', 'unknown')]:
+            with self.subTest(now=now, evidence=evidence):
+                bot.view = replace(self.view, evidence_id=evidence)
+                result = monitor.tick(now, bot)
+                self.assertEqual(result['state'], expected)
+                self.assertEqual(result['evidence'], evidence)
+                self.assertEqual(result['report'], expected == 'unknown')
+        self.assertEqual(len(bot.reads), 5)
+
+    def test_invalid_evidence_cannot_be_recycled_after_recovery(self):
+        monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 110, cadence=1))
+        bot = FakeBrowser(replace(self.view, evidence_id='loading-a', state='loading'))
+        self.assertEqual(monitor.tick(100, bot)['state'], 'unknown')
+        bot.view = replace(self.view, evidence_id='fresh-b')
+        self.assertEqual(monitor.tick(101, bot)['state'], 'healthy')
+        bot.view = replace(self.view, evidence_id='loading-a')
+        result = monitor.tick(102, bot)
+        self.assertEqual(result['state'], 'unknown')
+        self.assertTrue(result['report'])
+
     def test_read_failure_reports_uncertainty_without_exception_leak(self):
         conclusion = investigate_chart(self.issue, self.check, FakeBrowser(RuntimeError('secret')), now=100)['conclusion']
         self.assertEqual(conclusion['state'], 'unknown')

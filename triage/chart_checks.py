@@ -207,7 +207,8 @@ class ReleaseMonitor:
         self.stopped = False
         self.last_state = None
         self.last_tick = -1
-        self.last_evidence = plan.check.source_evidence
+        # At most one read per cadence slot in the <=24h release window.
+        self.seen_evidence = {plan.check.source_evidence}
 
     def stop(self):
         self.stopped = True
@@ -227,10 +228,11 @@ class ReleaseMonitor:
         self.next_due = self.plan.start + ((now - self.plan.start) // self.plan.cadence + 1) * self.plan.cadence
         try:
             view = bot.read_chart('entity-chart', self.plan.check.binding)
+            identifier(view.evidence_id)
             result = self.plan.check.evaluate(view, now)
-            if view.evidence_id == self.last_evidence:
-                result = {'state': 'unknown', 'evidence': view.evidence_id, 'uncertainty': 'reused evidence from previous check'}
-            self.last_evidence = view.evidence_id
+            if view.evidence_id in self.seen_evidence:
+                result = {'state': 'unknown', 'evidence': view.evidence_id, 'uncertainty': 'reused evidence within this release'}
+            self.seen_evidence.add(view.evidence_id)
             if not view.session_valid:
                 self.stop()
         except Exception:
