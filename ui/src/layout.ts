@@ -1,0 +1,6 @@
+export interface Layout {side:number;right:number;inspector:number;browser:number;history:number}
+export const defaultLayout:Layout={side:228,right:36,inspector:290,browser:65,history:160};
+const limits:Record<keyof Layout,[number,number]>={side:[170,350],right:[25,60],inspector:[140,600],browser:[25,85],history:[80,320]};
+export function clampPanel(key:keyof Layout,value:number){return Math.max(limits[key][0],Math.min(limits[key][1],Number.isFinite(value)?value:defaultLayout[key]));}
+export function readLayout(value:unknown):Layout {const input=value&&typeof value==='object'?value as Partial<Layout>:{};return Object.fromEntries(Object.keys(defaultLayout).map(k=>{const key=k as keyof Layout;return [key,clampPanel(key,input[key]??defaultLayout[key])];})) as unknown as Layout;}
+export function panelDelta(layout:Layout,key:keyof Layout,delta:number,width:number,height:number):Layout {const adjusted=key==='right'?-delta/Math.max(width,1)*100:key==='browser'?delta/Math.max(height-layout.history-12,1)*100:key==='inspector'||key==='history'?-delta:delta;const next={...layout,[key]:clampPanel(key,layout[key]+adjusted)};if(key==='inspector')next.inspector=Math.min(next.inspector,Math.max(140,height-260));if(key==='history')next.history=Math.min(next.history,Math.max(80,height-300));return next;}

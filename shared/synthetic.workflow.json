@@ -1,0 +1,18 @@
+{
+  "version": "workflow-studio/v1",
+  "title": "Synthetic · Search and inspect",
+  "synthetic": true,
+  "page": {
+    "urlTemplate": "https://example.com/search?query={xyz}&region={region}",
+    "parameters": { "xyz": "synthetic search", "region": "demo" }
+  },
+  "nodes": [
+    { "id": "page", "kind": "page", "title": "Search page", "position": { "x": 40, "y": 160 }, "provenance": "detected", "bindings": { "query": "xyz", "region": "region" } },
+    { "id": "enter", "kind": "action", "title": "Click Enter · candidate", "position": { "x": 340, "y": 160 }, "provenance": "model-proposed", "bindings": { "query": "xyz" }, "prompt": "Look for and click Enter", "action": { "verb": "click", "target": "button with accessible name Enter" }, "origin": "offline-template", "review": "pending", "timestamp": 4 },
+    { "id": "results", "kind": "segment", "title": "Inspect results segment", "position": { "x": 640, "y": 160 }, "provenance": "observed", "bindings": { "query": "xyz" }, "action": { "verb": "inspect", "target": "main search results region" }, "timestamp": 8 }
+  ],
+  "edges": [
+    { "id": "page_enter", "source": "page", "target": "enter" },
+    { "id": "enter_results", "source": "enter", "target": "results" }
+  ]
+}

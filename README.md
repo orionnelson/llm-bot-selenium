@@ -2,6 +2,29 @@
 
 Help an SRE investigate an issue by understanding what they see in their browser—then reuse their validated checks for release monitoring. This complements the existing log-analysis tool; it does not replace it.
 
+## Workflow Studio frontend — SRE Flow Builder
+
+A new editable frontend lives in **[`ui/`](ui/README.md)**. Start with `cd ui && npm ci --include=dev && npm run dev` (Node22+ and Python3 for artifact tests). The owner-hosted LAN demo is `http://smol-kitten.local:32085/`; it is not a public hosted service.
+
+| Workspace component | What it does |
+|---|---|
+| Component library + graph | Search/drag actions; connect input/output handles or use explicit Connect to; conditional Yes/No branches, minimap, pan/zoom and ELK layout. |
+| Node inspector | Edit targets, prompt, outputs and retry settings. Source is saved with each node. |
+| **Python** tab | Config→Python starters, editable per-node `run(inputs, context=None)`, provenance/review, `.py` export and optional authenticated LLM code generation. Example: input `i`, condition `i > 3`. |
+| **Record** button | Consented UI-authoring metadata capture; pause/resume/stop/export. Selenium browser recording is explicitly pending, not faked. |
+| Browser / debugger / timeline | Clearly labelled fixture browser; one recorded demo event clock synchronizes graph states, logs and outputs. Real browser frames, network evidence and webpage perception remain pending. |
+| History / persistence | Read-only historical graph snapshots, replay without infrastructure actions, local Save/Load, bounded undo/redo and persisted panel dimensions. |
+
+**Python-first functional DAG:** every canvas item now has a typed Python `Task`, explicit dependencies/routes, parameters, implementation text and loop-body scope. Uses existing stdlib **dataclasses + graphlib.TopologicalSorter**. Open **Task DAG** in the inspector or **DAG** in the canvas toolbar. Export Python functionality and JSON layout separately; safe Python/spec imports and plans do not execute handlers. [Framework choice, examples and CLI](docs/PYTHON_DAG.md). The DEMO/Triage overlap and full-width canvas constraints are also fixed structurally; visual browser acceptance remains pending.
+
+**Latest design expansion (unmerged):** structured `for`/`while` bodies with Continue/Repeat and DONE exits; explicit IF/ELSE paths; a recorded/live-triage URL/clickpath clipping designer and reusable snippet library; all five VS Code-style pane dividers. See the [control-flow, snippets and divider walkthrough](ui/README.md#control-flow-and-triage-design-expansion-pr11-review-hold). Snippet execution/live transport remains pending.
+
+The frontend never runs custom or generated Python. The Python counterpart [`triage/studio_python.py`](triage/studio_python.py) validates syntax and exports review-only modules; constrained branch evaluation does not use `eval`. A configured LLM adapter can return a candidate for human review; no provider is enabled by default. Webpage perception and selector discovery are pending.
+
+**Screenshots: blocked in this runtime, not fabricated.** Chromium cannot start with a usable sandbox and an alternate browser download timed out. [`ui/scripts/capture_screenshots.py`](ui/scripts/capture_screenshots.py) captures actual workspace, Python-inspector and recording-dialog PNGs on a sandbox-capable loopback environment. No empty/broken screenshot links or illustrations are presented as real screenshots. See the [component-by-component guide and capture instructions](ui/README.md).
+
+**Local checks:** 95 frontend tests passed, including real-Python parsing of frontend-generated artifacts; TypeScript/Vite build passed. Python regression suite: 97 tests run, 95 passed and 2 actual-browser tests skipped. No live Selenium recording, LLM inference, production infrastructure execution or visual screenshot acceptance is claimed.
+
 ## Expected behavior
 
 1. **Triage assistance:** observe an approved SRE browser session in Dynatrace, including navigation and shortcuts. Record the issue and visible page/chart context. The bot then follows its **own** browser investigation and returns an evidence-backed conclusion to assist the person—not a blind click replay.
