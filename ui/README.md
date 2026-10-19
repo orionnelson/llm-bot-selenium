@@ -115,4 +115,40 @@ flowchart LR
 
 ## What is not implemented
 
-Live Selenium recording/frames; LLM webpage perception; production integrations; a Python execution sandbox; WebSocket backend engine; PostgreSQL/Redis persistence; server workflow scheduling; production identity/RBAC. Generic parallel/loop palette items are configuration placeholders, not functioning concurrency executors. Unreviewed code is never executed by this frontend or exporter.
+Live Selenium recording/frames; LLM webpage perception; production integrations; a Python execution sandbox; WebSocket backend engine; PostgreSQL/Redis persistence; server workflow scheduling; production identity/RBAC. Parallel remains a configuration placeholder. For/while loops now have structured BODY/Continue/DONE semantics in the deterministic demo, not a production executor. Unreviewed code is never executed by this frontend or exporter.
+
+
+## Control-flow and triage design expansion (PR11 review hold)
+
+**PR11 remains unmerged pending owner review.**
+
+### Structured loops, not arbitrary back-edges
+
+- Templates → **For / While + IF / ELSE lab** provides a ready-to-run example. The loop variable changes each iteration and controls the nested branch.
+- Adding **For / While Loop** creates a paired header, editable body placeholder and Continue boundary. The header has **BODY** and **DONE** output ports plus a **Repeat** input. The paired Continue return is a dashed purple edge.
+- Configure `for` range (exclusive stop) or `while` comparison, initial value, variable, increment and an iteration cap (1–100). The cap is enforced, including wrong-direction while loops. Up to four nested body levels and a2500-event demo budget are bounded.
+- Every body path must reach its paired Continue; malformed paths fail rather than silently finish. Deleting a boundary/header removes the paired control node while preserving authored body actions. Arbitrary cycles and invalid Continue destinations remain rejected.
+- IF / ELSE cards show the predicate and both destinations. Each control port has one target; remove an existing edge before replacing it. Branch paths may converge into a shared next node.
+- Python starters/exports reflect **for** versus **while**. Manual/LLM code is still review-only; the demo evaluates declared numeric controls, not arbitrary Python.
+
+### Recorded/live triage → reusable browser snippet
+
+1. Open the right-side **Triage** tab. Set an entry URL or URL template such as `https://example.com/ops?service={service}`.
+2. Import `triage-session/v1` JSON, or explicitly load a labelled recorded fixture / demo live buffer. The live transport itself is pending; a live buffer can accept manual batches through the documented adapter seam.
+3. Select **From** and **Through** events. The highlighted inclusive click path keeps source event IDs and rebases timestamps.
+4. Name and save the snippet. The **Snippets** sidebar/library lets you insert an immutable per-node snapshot into any workflow. Parameter bindings are editable in the inspector; library entries and node snapshots survive workflow Save/Load and JSON export.
+5. Snippet nodes show entry URL, step count, provenance and click path. Running one returns **Pending**, not a fabricated browser success. Live Selenium execution, video frames and webpage perception require the future adapter.
+
+Imports are bounded and typed: unique ordered IDs, HTTP(S) URLs, no embedded credentials, redacted credential query fields, no URL fragments or typed-value/request-body payloads. Imported source claims are unverified. The editor's **Record** captures authoring metadata and is deliberately not treated as triage evidence. Explicit approval is requested before sending snippet metadata to a configured LLM.
+
+Minimal import shape:
+
+```json
+{"version":"triage-session/v1","id":"session-001","mode":"recorded","url":"https://example.com/ops","events":[{"id":"nav","elapsedMs":0,"action":"navigate","url":"https://example.com/ops"},{"id":"metrics","elapsedMs":1200,"action":"click","url":"https://example.com/ops","locator":"[data-testid=metrics]"}]}
+```
+
+### VS Code-style pane dividers
+
+All five boundaries now resize independently: library/canvas, canvas/right pane, canvas/inspector, browser/debugger, debugger/history. Splitters have visible grips, pointer capture, touch cancellation, keyboard arrows (Shift for larger steps), double-click/Home reset, minimum sizes and persisted dimensions. The canvas toolbar can restore a collapsed inspector or reset the whole layout. Saved layouts from the previous version migrate with defaults for new dividers.
+
+New implementation files: `control.ts`, `ControlFlowEditor.tsx`, `snippets.ts`, `TriageDesigner.tsx`, `layout.ts`, `Splitter.tsx`. Tests include bounded loops and scoped branch variables, malformed returns/cycles, snippet sanitization/range/persistence, pane math, and actual server-rendered component markup. SSR is not a screenshot or browser-pointer acceptance test.

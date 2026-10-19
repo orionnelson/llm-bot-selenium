@@ -1,6 +1,6 @@
 import ast
 import unittest
-from triage.studio_python import evaluate_branch, starter_source, export_workflow, validate_source
+from triage.studio_python import evaluate_branch, starter_source, export_workflow, validate_source, loop_values
 
 class StudioPythonTests(unittest.TestCase):
     def node(self, **config):
@@ -34,6 +34,30 @@ class StudioPythonTests(unittest.TestCase):
         for code in ('def run(', 'def other(inputs, context=None):\n    pass', 'def run(secret):\n    pass'):
             with self.assertRaises(ValueError): validate_source(code)
         with self.assertRaises(ValueError): export_workflow({'version': 99, 'nodes': []})
+
+    def test_bounded_for_and_while_config(self):
+        c = {'mode': 'for', 'variable': 'i', 'start': 0, 'stop': 3, 'step': 1, 'operator': '<', 'maxIterations': 5}
+        self.assertEqual(loop_values(c), [0, 1, 2])
+        self.assertEqual(loop_values({**c, 'mode': 'while'}), [0, 1, 2])
+        self.assertEqual(loop_values({**c, 'start': 3, 'stop': 0, 'step': -1}), [3, 2, 1])
+        with self.assertRaises(ValueError): loop_values({**c, 'mode': 'while', 'operator': '>=', 'stop': 0})
+
+    def test_loop_python_export_reflects_loop_form(self):
+        c = {'mode': 'for', 'variable': 'i', 'start': 0, 'stop': 3, 'step': 1, 'operator': '<', 'maxIterations': 5}
+        node = {'id': 'loop', 'data': {'action': 'loop', 'config': {'loop': c}}}
+        source = starter_source(node)
+        validate_source(source)
+        self.assertIn('for i in range(0, 3, 1)', source)
+        c['mode'] = 'while'
+        source = starter_source(node)
+        validate_source(source)
+        self.assertIn('while i < 3', source)
+        self.assertIn('Loop iteration cap reached', source)
+
+    def test_invalid_loop_bounds_fail_closed(self):
+        c = {'mode': 'for', 'variable': 'i', 'start': 0, 'stop': 3, 'step': 1, 'operator': '<', 'maxIterations': 5}
+        for patch in ({'step': 0}, {'step': True}, {'maxIterations': 101}, {'variable': 'i; import os'}):
+            with self.assertRaises(ValueError): loop_values({**c, **patch})
 
     def test_pending_integrations_do_not_claim_execution(self):
         source = starter_source({'id':'lambda', 'data':{'action':'lambda','config':{'target':'user-function'}}})

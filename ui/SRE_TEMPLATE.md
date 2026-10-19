@@ -17,7 +17,7 @@ An editable phase1/2 UI sandbox for llm-bot-selenium. No infrastructure executio
 
 ## State model
 
-`sre.ts`: versioned graph, registry, strict bounded graph/config validation, deterministic graph traversal and append-only demo events. Conditions use configured source handles and fixed demo errors; no eval. No generic parallel/loop runner: those palette actions are configuration placeholders pending the real engine. Unsupported multi-output serial nodes reject simulation.
+`sre.ts`: versioned graph, registry, strict bounded graph/config validation, deterministic graph traversal and append-only demo events. Conditions use configured source handles and fixed demo errors; no eval. Structured bounded for/while demo blocks are supported; generic parallel execution remains pending. See README.md for the newer control-flow, triage-snippet and splitter interfaces. Unsupported multi-output serial nodes reject simulation.
 `store.ts`: editable workflow plus bounded undo/redo and common replay clock in Zustand.
 `App.tsx`: unified graph, HTML browser fixture, debugger, inspector and history. ELK is loaded only for automatic layout.
 `SeedStudio.tsx` preserves the preceding URL-seed/semantic-flow editor source; legacy shared IR validators and 38 tests remain untouched. It is not the default SRE view.

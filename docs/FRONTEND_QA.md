@@ -4,9 +4,9 @@
 
 ## Executed locally
 
-- `cd ui && npm test`: **63 passed**, including graph/connection round trips, HTTP-compatible IDs, event replay, configured numeric branch evaluation, custom-code execution refusal, recording pause/resume/stop/privacy/bounds, and actual Python AST parsing of frontend-generated artifacts.
-- `cd ui && npm run build`: TypeScript + Vite **passed**. Optional lazy ELK bundle exceeds Vite's chunk-size advisory; primary frontend JS remains under500KB minified.
-- Python regression suite with existing Selenium test dependencies: **85 tests run, 83 passed, 2 actual-browser tests skipped**. New `test_studio_python.py` covers config→Python, branch comparisons, syntax/contract validation, preserved edited code and no execution during export.
+- `cd ui && npm test`: **85 passed**, including graph/connection round trips, HTTP-compatible IDs, event replay, configured numeric branch evaluation, custom-code execution refusal, recording pause/resume/stop/privacy/bounds, and actual Python AST parsing of frontend-generated artifacts.
+- `cd ui && npm run build`: TypeScript + Vite **passed**. Vite reports chunk-size advisories for the approximately514KB frontend bundle and optional1.44MB lazy ELK bundle; real-browser performance acceptance remains pending.
+- Python regression suite with existing Selenium test dependencies: **88 tests run, 86 passed, 2 actual-browser tests skipped**. New `test_studio_python.py` covers config→Python, branch comparisons, syntax/contract validation, preserved edited code and no execution during export.
 - Python compile checks for exporter and screenshot helper passed.
 - Static host actual HTTP asset hashes checked against production build after deployment; existing Swiss application backed up. LAN URL owner-confirmed, not independently resolved from the OpenClaw pod.
 - Optional generation endpoint without provider configuration: actual HTTP503 `status: pending`; no inference/credential access occurred.
@@ -26,3 +26,15 @@
 - Recording is explicitly UI-authoring metadata, not browser capture or a recording of typed content. No automatic upload or persistence of captures.
 - LLM service token is component memory only; provider key is server environment only. Use HTTPS and real authentication/RBAC before public or sensitive deployment.
 - Conditional configuration uses a restricted operator map, not JavaScript/Python eval.
+
+## Control-flow / snippets / pane expansion — owner review hold
+
+PR11 stays unmerged for owner review.
+
+- **85 frontend tests pass**: structured for/while returns and caps, decreasing/empty ranges, scoped per-iteration IF/ELSE, invalid body paths, invalid Repeat destinations, pair deletion, distinct Python source forms, session clipping/source IDs/relative times, URL credential redaction, fragment removal, typed-value rejection, snippet persistence and Pending execution, old-layout migration and all pane dimensions.
+- Three tests render the real React component markup server-side, including all five accessible splitter elements, loop editor fields and the honest no-session/snippet state. This is SSR evidence, not browser screenshots or pointer acceptance.
+- Python regression: **88 run / 86 passed / 2 actual-browser skipped**. Frontend-generated for/while Python is additionally parsed by real Python AST in the frontend suite without executing source.
+- TypeScript/Vite build passes, with chunk-size advisories (main about514KB, lazy ELK1.44MB).
+- Live triage event transport, real browser playback, automatic webpage understanding and production execution are still pending. The live-buffer seam accepts manually imported event batches only.
+- Loop simulation uses structured header/body/Continue/DONE blocks, at most100iterations per loop, four nested body levels and2500events total. It does not run arbitrary Python or allow arbitrary cyclic edges.
+- Imports and reusable per-node snippets remain unverified plans; they never turn into fabricated browser success. Snippet metadata requires explicit data-boundary approval before an optional configured provider call.

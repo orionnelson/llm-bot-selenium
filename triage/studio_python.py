@@ -31,6 +31,28 @@ def evaluate_branch(config, inputs):
     value = numeric(inputs[config["input"]])
     return {"branch": "yes" if OPS[config["operator"]](value, config["threshold"]) else "no"}
 
+def loop_values(config):
+    condition_config({"input": config.get("variable"), "operator": config.get("operator"), "threshold": config.get("stop")})
+    if config.get("mode") not in {"for", "while"}:
+        raise ValueError("Loop mode must be for or while")
+    for name in ("start", "stop", "step", "maxIterations"):
+        value = config.get(name)
+        if isinstance(value, bool) or not isinstance(value, int) or abs(value) > 1000000:
+            raise ValueError("Loop bounds must be bounded integers")
+    if config["step"] == 0 or not 1 <= config["maxIterations"] <= 100:
+        raise ValueError("Invalid loop step or iteration cap")
+    value, values = config["start"], []
+    def continues():
+        if config["mode"] == "while":
+            return OPS[config["operator"]](value, config["stop"])
+        return value < config["stop"] if config["step"] > 0 else value > config["stop"]
+    while continues():
+        if len(values) >= config["maxIterations"]:
+            raise ValueError("Loop iteration cap reached")
+        values.append(value)
+        value += config["step"]
+    return values
+
 def validate_source(source):
     if not isinstance(source, str) or len(source) > 30000:
         raise ValueError("Python source must be at most 30000 characters")
@@ -46,6 +68,27 @@ def validate_source(source):
 def starter_source(node):
     action = node["data"]["action"]
     config = node["data"].get("config", {})
+    if action == "loop":
+        c = config["loop"]
+        # Validate without running a body; a nonterminating while is still valid source protected by its cap.
+        condition_config({"input": c["variable"], "operator": c["operator"], "threshold": c["stop"]})
+        for key in ("start", "stop", "step", "maxIterations"):
+            if isinstance(c[key], bool) or not isinstance(c[key], int) or abs(c[key]) > 1000000:
+                raise ValueError("Invalid loop bounds")
+        if c["mode"] not in {"for", "while"} or c["step"] == 0 or not 1 <= c["maxIterations"] <= 100:
+            raise ValueError("Invalid loop mode, step or cap")
+        var = c["variable"]
+        if c["mode"] == "for":
+            header = f'    for {var} in range({c["start"]}, {c["stop"]}, {c["step"]}):\n'
+            advance = ''
+        else:
+            header = f'    {var} = {c["start"]}\n    while {var} {c["operator"]} {c["stop"]}:\n'
+            advance = f'        {var} += {c["step"]}\n'
+        return ('# Structured loop; body execution adapter pending.\ndef run(inputs, context=None):\n    values = []\n' + header
+                + f'        if len(values) >= {c["maxIterations"]}:\n            raise RuntimeError("Loop iteration cap reached")\n'
+                + f'        values.append({var})\n' + advance + '    return {"iterations": values, "body_status": "pending"}\n')
+    if action == "loop-end":
+        return 'def run(inputs, context=None):\n    return {"control": "continue"}\n'
     if action == "condition":
         c = config.get("condition")
         if c:
@@ -60,7 +103,7 @@ def starter_source(node):
     if action in {"start", "end"}:
         status = "started" if action == "start" else "completed"
         return f'def run(inputs, context=None):\n    return {{"status": {status!r}}}\n'
-    payload = {key: config.get(key) for key in ("target", "region", "metrics", "timeRange", "method")}
+    payload = {key: config.get(key) for key in ("target", "region", "metrics", "timeRange", "method", "snippet")}
     payload["action"] = action
     return ('# Integration and webpage perception are pending.\nimport json\n\n'
             'def run(inputs, context=None):\n'
