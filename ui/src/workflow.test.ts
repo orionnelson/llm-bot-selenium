@@ -16,6 +16,12 @@ describe('v1 cross-runtime interchange', () => {
     expect(Object.values(flow.page.parameters).every(v => v === '')).toBe(true);
   });
   for (const url of cases.unsafe) it(`rejects unsafe URL: ${url}`, () => expect(() => safeUrl(url)).toThrow());
+  it('redacts signed query data in page seeds and rejects signed parameter bindings', () => {
+    const flow = createSeed('https://example.com/?signature=private&service={service}');
+    expect(serialize(flow)).not.toContain('private');
+    expect(flow.page.parameters).toEqual({ service: '' });
+    expect(() => createSeed('https://example.com/{signature}')).toThrow('Sensitive parameter');
+  });
   it('has honest proposal provenance and strips values at persistence boundary', () => {
     const flow = fresh();
     expect(flow.nodes[1]).toMatchObject({ provenance: 'model-proposed', review: 'pending', origin: 'offline-template' });
