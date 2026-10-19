@@ -78,7 +78,7 @@ export function makeRun(workflow:Workflow,scenario:string):Run {
    if(scenario==='waiting'&&n.data.action==='incident')emit(n,'waiting','Demo: waiting for manual approval');
    if(scenario==='retry'&&n.data.action==='logs'){emit(n,'retrying','Demo: transient timeout; retry scheduled');emit(n,'running','Demo: retry attempt 1');}
    if(scenario==='failure'&&n.data.action==='incident'){emit(n,'failed','Demo: ServiceNow permission denied (fixture)');status='Failed';return false;}
-   const c=n.data.config.condition;const value=c?(env[c.input]??c.sample):(scenario==='healthy'?0:5);const branch=c?evaluateCondition(c,value):scenario!=='healthy';
+   const c=n.data.config.condition;const value=c?(Object.hasOwn(env,c.input)?env[c.input]:c.sample):(scenario==='healthy'?0:5);const branch=c?evaluateCondition(c,value):scenario!=='healthy';
    const output=n.data.action==='condition'?{input:c?.input??'errors',value,branch:branch?'yes':'no',demonstration:true}:n.data.action==='lambda'?{functionName:n.data.config.target,region:n.data.config.region,metrics:{errors:scenario==='healthy'?0:5,throttles:0,invocations:120},hasErrors:scenario!=='healthy'}:{target:n.data.config.target,demonstration:true};
    emit(n,'success',`Demo: ${n.data.label} completed`,output);id=edge(n,n.data.action==='condition'?(branch?'yes':'no'):undefined);
   }
@@ -88,7 +88,7 @@ export function makeRun(workflow:Workflow,scenario:string):Run {
  for(const n of w.nodes)if(!visited.has(n.id))events.push({id:`evt-${events.length}`,nodeId:n.id,ms,status:'skipped',message:`Demo: ${n.data.label} not reached`});
  return {id:`demo-${Date.now()}`,started:new Date().toISOString(),scenario,workflow:w,events,status,duration:ms};
 }
-export function atTime(run:Run|undefined,ms:number){const states:Record<string,Status>={};const outputs:Record<string,Record<string,unknown>>={};let active='';for(const e of run?.events??[]){if(e.ms>ms)break;states[e.nodeId]=e.status;if(e.status!=='skipped')active=e.nodeId;if(e.output)outputs[e.nodeId]=e.output;}return {states,outputs,active};}
+export function atTime(run:Run|undefined,ms:number){const states:Record<string,Status>=Object.create(null);const outputs:Record<string,Record<string,unknown>>=Object.create(null);let active='';for(const e of run?.events??[]){if(e.ms>ms)break;states[e.nodeId]=e.status;if(e.status!=='skipped')active=e.nodeId;if(e.output)outputs[e.nodeId]=e.output;}return {states,outputs,active};}
 
 export function linkNodes(workflow:Workflow, source:string, target:string, sourceHandle:string|null=null,targetHandle:string|null=null):Workflow {
  const from=workflow.nodes.find(n=>n.id===source),to=workflow.nodes.find(n=>n.id===target);
