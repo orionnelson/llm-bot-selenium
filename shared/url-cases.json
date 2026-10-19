@@ -1,0 +1,8 @@
+{
+  "seeds": [
+    { "url": "https://example.com/search?query={xyz}&region=discard-me", "parameters": ["region", "xyz"], "absent": "discard-me" },
+    { "url": "https://example.com?token=never-store-this&query={xyz}", "parameters": ["xyz"], "absent": "never-store-this" },
+    { "url": "http://localhost:8000/search?q={term}", "parameters": ["term"], "absent": "not-present" }
+  ],
+  "unsafe": ["javascript:alert(1)", "file:///tmp/video", "data:text/html,test", "https://user:password@example.com", "https://example.com?token=hidden", "https://example.com/#private", "https://example.com\\@evil.com", "https://{host}/", "https://example.com?query={password}", "https://example.com:99999/"]
+}

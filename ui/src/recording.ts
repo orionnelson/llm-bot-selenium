@@ -1,0 +1,6 @@
+import { uid } from './workflow';
+export interface CaptureEvent { id:string; elapsedMs:number; type:'capture.started'|'capture.paused'|'capture.resumed'|'capture.stopped'|'node.selected'|'workflow.changed'; nodeId?:string; nodes?:number; edges?:number }
+export interface Capture { id:string; kind:'ui-authoring'; status:'recording'|'paused'|'stopped'; startedAt:string; events:CaptureEvent[]; browserCapture:'pending' }
+export function startCapture():Capture{return {id:uid('capture'),kind:'ui-authoring',status:'recording',startedAt:new Date().toISOString(),browserCapture:'pending',events:[{id:uid('event'),elapsedMs:0,type:'capture.started'}]};}
+export function appendCapture(c:Capture|undefined,event:Omit<CaptureEvent,'id'|'elapsedMs'>):Capture|undefined{if(!c||c.status!=='recording')return c;if(c.events.length>=1000)return {...c,status:'paused'};return {...c,events:[...c.events,{...event,id:uid('event'),elapsedMs:Math.max(0,Date.now()-Date.parse(c.startedAt))}]};}
+export function controlCapture(c:Capture,control:'pause'|'resume'|'stop'):Capture{if(c.status==='stopped')return c;const type=control==='pause'?'capture.paused':control==='resume'?'capture.resumed':'capture.stopped';const next=appendCapture({...c,status:'recording'},{type})!;return {...next,status:control==='pause'?'paused':control==='resume'?'recording':'stopped'};}
