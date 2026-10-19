@@ -1,7 +1,7 @@
 import { VERSION, type Kind, type Workflow, type WorkflowNode } from '../../shared/workflow';
 export { VERSION, type Kind, type Provenance, type Workflow, type WorkflowNode } from '../../shared/workflow';
 export const MAX_BYTES = 1_000_000;
-const sensitive = /password|passwd|pwd|secret|token|auth|credential|cookie|session|api.?key|access.?key|private.?key|^key$|^sid$|^jwt$|^code$/i;
+export const sensitive = /password|passwd|pwd|secret|token|auth|credential|signature|cookie|session|api.?key|access.?key|private.?key|^key$|^sid$|^jwt$|^code$/i;
 const name = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;
 const leak = /(?:password|passwd|pwd|secret|token|authorization|api[_-]?key|access[_-]?key|private[_-]?key|cookie|session|\bsid|\bjwt)\s*[=:]\s*(?!\[REDACTED\])\S+|bearer\s+\S+/i;
 const reserved = new Set(['__proto__', 'constructor', 'prototype']);
