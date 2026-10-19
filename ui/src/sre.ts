@@ -101,7 +101,7 @@ export function linkNodes(workflow:Workflow, source:string, target:string, sourc
  if(from.data.action==='loop-end'&&from.data.config.loopOwner!==target)throw Error('Continue must return to its paired loop');
  if(from.data.action==='condition'&&!['yes','no'].includes(handle!))throw Error('Choose the Yes or No branch');
  if(workflow.edges.some(e=>e.source===source&&e.target===target&&(e.sourceHandle||null)===handle))throw Error('These nodes are already linked');
- const candidate=validateFlow({...workflow,edges:[...workflow.edges,{id:uid('edge'),source,target,sourceHandle:handle,targetHandle:from.data.action==='loop-end'?'repeat':null,label:handle?.toUpperCase(),style:{stroke:handle==='no'?'#FF4D71':'#00D68F',strokeWidth:2}}]});
+ const candidate=validateFlow({...workflow,edges:[...workflow.edges,{id:uid('edge'),source,target,sourceHandle:handle,targetHandle:from.data.action==='loop-end'?'repeat':null,label:handle?.toUpperCase(),style:{stroke:handle==='no'?'#FF4D71':['body','continue'].includes(handle||'')?'#A36BFF':'#00D68F',strokeWidth:2,...(handle==='continue'?{strokeDasharray:'6 4'}:{})}}]});
  if(workflow.edges.some(e=>e.source===source&&(e.sourceHandle||null)===handle))throw Error('Output is already connected. Delete its existing connection before replacing it.');return candidate;
 }
 
