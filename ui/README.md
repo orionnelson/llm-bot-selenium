@@ -49,6 +49,10 @@ python -m unittest discover -s tests -p test_studio_python.py -v
 
 Syntax validation is not a security sandbox. Do not import or run unreviewed Python. Python export is an artifact, not a deployed DAG or workflow runner.
 
+## Import consented loopback observer metadata
+
+`SeleniumChartPort.export_studio_session(issue, consent=True)` exports an existing stopped issue's navigation and semantic `shortcut-open-chart` events to **Triage → Import triage session JSON**. Clip and reuse the path in a snippet node; JSON/Python DAG artifacts retain it, and execution remains **Pending**. The export omits WebDriver IDs, chart binding queries and evidence values. This is imported/unverified metadata, not video or a live recorder. [Full usage, privacy boundaries and actual cross-language tests](../docs/OBSERVER_STUDIO_QA.md).
+
 ## Recording boundaries
 
 Record captures interactions with this editor only. The record dialog names the scope before starting. A stopped JSON capture has `kind: ui-authoring` and `browserCapture: pending`. This avoids mistaking editor telemetry for a Selenium browser recording. The next browser adapter must supply observed actions, real frames, locator metadata and session ownership; page extraction/LLM selector discovery is explicitly pending.
