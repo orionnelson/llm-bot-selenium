@@ -88,7 +88,7 @@ The script uses an isolated temporary profile and the existing Selenium runtime 
 - `src/python.ts`: config→Python starters, constrained branch comparisons, generation-request contract and source export.
 - `src/PythonInspector.tsx`: branch fields, editable source, provenance/review and LLM request UI.
 - `src/recording.ts`: bounded consented authoring capture and pause/resume/stop transitions.
-- `src/workflow.ts`, `shared/`: earlier URL-seed IR and validation; SRE graph uses its own version1 schema. `SeedStudio.tsx` preserves the earlier experimental editor source, not an additional route.
+- `src/workflow.ts`, `shared/`: URL-seed interchange/privacy guards. `scripts/seed-page.mjs` uses this actual validator (Node22.18+); `src/page-seed.ts` converts canonical offline seeds through the active editor import into native version1 workflow/snippet metadata. `SeedStudio.tsx` remains archived source, not an additional route. See [CLI usage and evidence](../docs/PAGE_SEED_QA.md).
 - `triage/studio_python.py`: Python-side branch/config handling, AST syntax checks and review-only export.
 
 ```mermaid
