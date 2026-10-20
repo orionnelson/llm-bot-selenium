@@ -36,6 +36,10 @@ npm run seed -- open 'https://example.com/services/{service}?query={xyz}' --outp
 
 Upload `page.json` using **Run History → Import workflow JSON** in the active editor (save the current draft first). Creates a reusable **offline** snippet with empty parameter bindings; no page/model is invoked and demo execution stops **Pending**, not success. Output never overwrites an existing file. Use synthetic URLs; command-line input can appear in shell history. [Usage, architecture, actual test evidence and limitations](docs/PAGE_SEED_QA.md).
 
+### Consented observer metadata → Studio snippets
+
+The existing loopback Selenium chart adapter can now export a stopped SRE issue as `triage-session/v1` metadata with separate export consent. Import it in **Triage**, clip navigation/semantic shortcuts, and add a reusable snippet to the native graph. WebDriver IDs, binding queries and chart values stay out of exports; full issue evidence still serves independent investigation and bounded release checks. Imported paths remain unverified and execution **Pending**, not fabricated video or browser success. [Usage, architecture and executed evidence](docs/OBSERVER_STUDIO_QA.md).
+
 ## Expected behavior
 
 1. **Triage assistance:** observe an approved SRE browser session in Dynatrace, including navigation and shortcuts. Record the issue and visible page/chart context. The bot then follows its **own** browser investigation and returns an evidence-backed conclusion to assist the person—not a blind click replay.

@@ -56,6 +56,10 @@ class ChartDOMTests(unittest.TestCase):
         self.assertEqual(self.sre.driver.current_url, original_url)
         self.assertEqual(self.routes, ['dashboard', 'entity-chart'])
         self.assertNotIn('Ignore', str(issue))
+        session = self.sre.export_studio_session(issue, consent=True)
+        self.assertEqual([e['action'] for e in session['events']], ['navigate', 'shortcut-open-chart'])
+        self.assertNotIn('binding', str(session))
+        self.assertEqual(self.sre.driver.current_url, original_url)
         monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
         self.assertTrue(monitor.tick(100, self.bot)['report'])
         self.now = 400
