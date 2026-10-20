@@ -1,5 +1,5 @@
-import { VERSION, type Kind, type Workflow, type WorkflowNode } from '../../shared/workflow';
-export { VERSION, type Kind, type Provenance, type Workflow, type WorkflowNode } from '../../shared/workflow';
+import { VERSION, type Kind, type Workflow, type WorkflowNode } from '../../shared/workflow.ts';
+export { VERSION, type Kind, type Provenance, type Workflow, type WorkflowNode } from '../../shared/workflow.ts';
 export const MAX_BYTES = 1_000_000;
 export const sensitive = /password|passwd|pwd|secret|token|auth|credential|signature|cookie|session|api.?key|access.?key|private.?key|^key$|^sid$|^jwt$|^code$/i;
 const name = /^[A-Za-z_][A-Za-z0-9_]{0,63}$/;

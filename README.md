@@ -25,6 +25,17 @@ The frontend never runs custom or generated Python. The Python counterpart [`tri
 
 **Local checks:** 95 frontend tests passed, including real-Python parsing of frontend-generated artifacts; TypeScript/Vite build passed. Python regression suite: 97 tests run, 95 passed and 2 actual-browser tests skipped. No live Selenium recording, LLM inference, production infrastructure execution or visual screenshot acceptance is claimed.
 
+### Offline CLI page seeds
+
+With Node22.18+ and UI dependencies installed:
+
+```sh
+cd ui
+npm run seed -- open 'https://example.com/services/{service}?query={xyz}' --output page.json
+```
+
+Upload `page.json` using **Run History → Import workflow JSON** in the active editor (save the current draft first). Creates a reusable **offline** snippet with empty parameter bindings; no page/model is invoked and demo execution stops **Pending**, not success. Output never overwrites an existing file. Use synthetic URLs; command-line input can appear in shell history. [Usage, architecture, actual test evidence and limitations](docs/PAGE_SEED_QA.md).
+
 ## Expected behavior
 
 1. **Triage assistance:** observe an approved SRE browser session in Dynatrace, including navigation and shortcuts. Record the issue and visible page/chart context. The bot then follows its **own** browser investigation and returns an evidence-backed conclusion to assist the person—not a blind click replay.
