@@ -1,0 +1,69 @@
+# Test-only, single-instance Grid. No public service, personal profiles or production access.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: selenium-grid
+  namespace: llms
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: selenium-grid}
+  template:
+    metadata:
+      labels: {app: selenium-grid}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: selenium
+          image: selenium/standalone-chrome:4.51.0-20261010
+          ports:
+            - {containerPort: 4444}
+          env:
+            - {name: SE_NODE_MAX_SESSIONS, value: '1'}
+            # Bypass the image's --no-sandbox shell wrapper, not the browser sandbox.
+            - {name: SE_BROWSER_BINARY_LOCATION, value: /opt/google/chrome/chrome}
+            - {name: SE_ENABLE_TRACING, value: 'false'}
+          securityContext:
+            allowPrivilegeEscalation: false
+          resources:
+            requests: {cpu: 500m, memory: 1Gi}
+            limits: {cpu: '2', memory: 4Gi}
+          readinessProbe:
+            httpGet: {path: /status, port: 4444}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - {name: shm, mountPath: /dev/shm}
+      volumes:
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 2Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: selenium-grid
+  namespace: llms
+spec:
+  selector: {app: selenium-grid}
+  ports:
+    - {name: webdriver, port: 4444, targetPort: 4444}
+---
+# Browser egress stays denied. Synthetic data URLs need no network access.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: selenium-grid-synthetic-only
+  namespace: llms
+spec:
+  podSelector:
+    matchLabels: {app: selenium-grid}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - {protocol: TCP, port: 4444}
+  egress: []

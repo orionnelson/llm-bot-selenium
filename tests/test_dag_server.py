@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from dataclasses import replace
 from http.client import HTTPConnection
-from http.server import HTTPServer
+from http.server import ThreadingHTTPServer
 import json
 from pathlib import Path
 import tempfile
@@ -23,7 +23,7 @@ def definition():
 
 
 @contextmanager
-def backend(dag=None):
+def backend(dag=None, **options):
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
         path = root / 'workflow.py'
@@ -31,7 +31,7 @@ def backend(dag=None):
         assets = root / 'dist'
         assets.mkdir()
         (assets / 'index.html').write_text('<title>DAG editor</title>')
-        server = HTTPServer(('127.0.0.1', 0), handler(path, assets.resolve()))
+        server = ThreadingHTTPServer(('127.0.0.1', 0), handler(path, assets.resolve(), **options))
         thread = Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:

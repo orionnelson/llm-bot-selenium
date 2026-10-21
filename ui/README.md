@@ -171,3 +171,8 @@ Open **Task DAG** for each selected item, or **DAG** in the canvas toolbar for t
 Hand-edit the Python definition, convert it with `python -m triage.dag workflow_dag.py --format spec --output workflow.dag.json`, then import that spec and optional layout. The loader accepts only literal constructors and never executes submitted code. Full [typed-model and CLI guide](../docs/PYTHON_DAG.md), including limitations and existing-framework rationale.
 
 The top-right header now reserves independent columns for tabs, DEMO/REPLAY and maximize; tabs scroll inside their own area. React Flow explicitly fills all four canvas edges and the center track can shrink without leaving a stale right-side gap.95frontendtests and95Pythonpassed/2browser-skipped; visual browser acceptance remains blocked, not claimed.
+
+
+## Test-mode generator and Selenium Grid
+
+Opt-in backend generation uses Smol Friend **Qwen3.6-35B-A3B Q4**, returning review-only candidates for saved DAG tasks. A private single-instance Selenium Grid manifest and synthetic smoke CLI are included. [Run instructions, actual evidence and deployment blockers](../docs/TEST_RUNTIME.md). Existing LAN/static hosting is not silently upgraded; no generated code or real-site workflow is executed.

@@ -94,3 +94,8 @@ On Windows, quote executable paths such as `"C:\Program Files (x86)\Microsoft\Ed
 [Chart DOM QA](docs/BROWSER_CHART_QA.md) · [Contract QA](docs/CHART_QA.md) · [Architecture and current boundaries](docs/ARCHITECTURE.md) · [Acceptance requirements](docs/REQUIREMENTS.md) · [Executed browser QA](EDGE_QA.md)
 
 Tested feature PRs auto-merge into `blue-master`. Releases into `main` remain human-controlled.
+
+
+## Test-mode generator and Selenium Grid
+
+Opt-in backend generation uses Smol Friend **Qwen3.6-35B-A3B Q4**, returning review-only candidates for saved DAG tasks. A private single-instance Selenium Grid manifest and synthetic smoke CLI are included. [Run instructions, actual evidence and deployment blockers](docs/TEST_RUNTIME.md). Existing LAN/static hosting is not silently upgraded; no generated code or real-site workflow is executed.

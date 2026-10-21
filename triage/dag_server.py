@@ -2,11 +2,12 @@
 from __future__ import annotations
 import argparse
 import hashlib
-from http.server import HTTPServer, SimpleHTTPRequestHandler
+from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import json
 import os
 from pathlib import Path
 import tempfile
+from threading import Lock
 from urllib.parse import unquote, urlsplit
 
 from .dag import DAG, load_python
@@ -23,8 +24,9 @@ def snapshot(path):
             'revision': hashlib.sha256(source).hexdigest()}
 
 
-def handler(dag_path, assets):
+def handler(dag_path, assets, *, test_mode=False):
     """One trusted server-side definition path; clients cannot select filesystem paths."""
+    dag_lock, generation_lock = Lock(), Lock()
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(assets), **kwargs)
@@ -59,6 +61,18 @@ def handler(dag_path, assets):
         def do_GET(self):
             if not self.local_request():
                 return self.reply(403, {'error': 'Local same-origin requests only'})
+            if urlsplit(self.path).path == '/api/test/status':
+                if not test_mode:
+                    return self.reply(503, {'error': 'Test integrations disabled'})
+                from .test_codegen import MODEL
+                from .grid import status
+                grid = {'ready': False, 'status': 'not configured'}
+                if os.environ.get('SELENIUM_GRID_URL'):
+                    try:
+                        grid = {**status(os.environ['SELENIUM_GRID_URL']), 'status': 'reachable'}
+                    except Exception:
+                        grid = {'ready': False, 'status': 'unreachable or invalid'}
+                return self.reply(200, {'mode': 'test', 'generator': MODEL, 'grid': grid, 'execution': 'disabled'})
             if urlsplit(self.path).path == '/api/dag':
                 try:
                     return self.reply(200, snapshot(dag_path))
@@ -74,7 +88,44 @@ def handler(dag_path, assets):
             # Avoid a second static-file path bypassing the GET boundary.
             self.send_error(405)
 
+        def do_POST(self):
+            self.close_connection = True
+            if not self.local_request():
+                return self.reply(403, {'error': 'Local same-origin requests only'})
+            if self.path != '/api/python/generate':
+                return self.reply(404, {'error': 'Not found'})
+            if not test_mode:
+                return self.reply(503, {'error': 'Test generation disabled; start with --test-mode'})
+            if self.headers.get_content_type() != 'application/json' or self.headers.get('Transfer-Encoding'):
+                return self.reply(415, {'error': 'Send bounded application/json'})
+            try:
+                size = int(self.headers.get('Content-Length', '0'))
+                if not 0 < size <= 65536:
+                    return self.reply(413, {'error': 'Generation request exceeds bounds'})
+                value = json.loads(self.rfile.read(size))
+                node_id, instructions = value['nodeId'], value['instructions']
+                if not isinstance(node_id, str) or not isinstance(instructions, str) or not 1 <= len(instructions) <= 12000:
+                    raise ValueError('Invalid generation request')
+                dag = DAG.from_spec(snapshot(dag_path)['definition'])
+                if not any(t.task_id == node_id for t in dag.tasks):
+                    return self.reply(409, {'error': 'Save the DAG before generating for this task'})
+            except (ValueError, TypeError, KeyError, SyntaxError, OSError, RecursionError, AttributeError):
+                return self.reply(400, {'error': 'Invalid saved DAG or generation request'})
+            from .test_codegen import generate
+            if not generation_lock.acquire(blocking=False):
+                return self.reply(429, {'error': 'Test generation already in progress'})
+            try:
+                return self.reply(200, generate(dag, node_id, instructions))
+            except Exception:
+                return self.reply(502, {'error': 'Test model unavailable or candidate invalid; no source applied/executed'})
+            finally:
+                generation_lock.release()
+
         def do_PUT(self):
+            with dag_lock:
+                return self.put_definition()
+
+        def put_definition(self):
             self.close_connection = True
             if not self.local_request():
                 return self.reply(403, {'error': 'Local same-origin requests only'})
@@ -121,13 +172,14 @@ def main():
     parser.add_argument('--dag', type=Path, required=True, help='Existing declarative Python DAG; authoritative, updated atomically')
     parser.add_argument('--assets', type=Path, default=Path('ui/dist'))
     parser.add_argument('--port', type=int, default=3001)
+    parser.add_argument('--test-mode', action='store_true', help='Enable review-only local Smol Friend generation and Grid status')
     args = parser.parse_args()
     try:
         snapshot(args.dag)  # Never seed missing/invalid definitions from browser state.
     except (OSError, ValueError, TypeError, KeyError, SyntaxError, RecursionError, AttributeError):
         parser.error('Server DAG is missing or invalid; no fallback definition loaded')
     # shortcut: one local process owns this file; add locking before multi-worker hosting.
-    with HTTPServer(('127.0.0.1', args.port), handler(args.dag.resolve(), args.assets.resolve())) as server:
+    with ThreadingHTTPServer(('127.0.0.1', args.port), handler(args.dag.resolve(), args.assets.resolve(), test_mode=args.test_mode)) as server:
         print(f'DAG editor: http://127.0.0.1:{server.server_port} (planning only)', flush=True)
         server.serve_forever()
 
