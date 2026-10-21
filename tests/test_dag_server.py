@@ -130,6 +130,15 @@ class DAGServerTests(unittest.TestCase):
             self.assertEqual(request(port)[0], 422)
             self.assertFalse(marker.exists())
 
+    def test_ambiguous_backend_python_is_not_projected_or_overwritten(self):
+        with backend() as (port, path, _):
+            revision = request(port)[1]['revision']
+            source = definition().to_python().replace("DAG(name='Backend authored'", "DAG(name='Hidden', name='Backend authored'", 1)
+            path.write_text(source)
+            self.assertEqual(request(port)[0], 422)
+            self.assertNotEqual(commit(port, revision, definition().to_spec())[0], 200)
+            self.assertEqual(path.read_text(), source)
+
     def test_persistence_failure_does_not_destroy_definition(self):
         with backend() as (port, path, _):
             before = path.read_bytes()

@@ -71,3 +71,12 @@ it('ignores React Flow measurements but detects author edits while requests are 
  expect(draftKey(measured)).not.toBe(key);
  expect(draftKey({...view,nodes:view.nodes.map(n=>({...n,position:{x:42,y:19}}))})).not.toBe(key);
 });
+
+it('refuses an ambiguous Python definition rather than projecting its last keyword',async()=>{
+ const path=join(directory,'dag.py'),source=await readFile(path,'utf8');
+ await writeFile(path,source.replace('DAG(name=', "DAG(name='Hidden', name="));
+ try{
+  await expect(loadDAG()).rejects.toThrow('DAG backend unavailable or rejected the definition (422)');
+  expect(await readFile(path,'utf8')).toContain("DAG(name='Hidden', name=");
+ }finally{await writeFile(path,source);}
+});
