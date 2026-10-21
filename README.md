@@ -2,9 +2,11 @@
 
 Help an SRE investigate an issue by understanding what they see in their browser—then reuse their validated checks for release monitoring. This complements the existing log-analysis tool; it does not replace it.
 
-## Workflow Studio frontend — SRE Flow Builder
+## DAG-first Workflow Studio — SRE Flow Builder
 
-A new editable frontend lives in **[`ui/`](ui/README.md)**. Start with `cd ui && npm ci --include=dev && npm run dev` (Node22+ and Python3 for artifact tests). The owner-hosted LAN demo is `http://smol-kitten.local:32085/`; it is not a public hosted service.
+The canonical Python DAG now drives the canvas through a minimal validation/storage backend. [Run the backend + UI](docs/PYTHON_DAG.md#dag--ui-backend-authoritative-direction). It plans but never executes tasks. The existing LAN static demo is unchanged.
+
+The editable frontend lives in **[`ui/`](ui/README.md)**. Start with `cd ui && npm ci --include=dev && npm run dev` (Node22+ and Python3 for artifact tests). The owner-hosted LAN demo is `http://smol-kitten.local:32085/`; it is not a public hosted service.
 
 | Workspace component | What it does |
 |---|---|
@@ -13,7 +15,7 @@ A new editable frontend lives in **[`ui/`](ui/README.md)**. Start with `cd ui &&
 | **Python** tab | Config→Python starters, editable per-node `run(inputs, context=None)`, provenance/review, `.py` export and optional authenticated LLM code generation. Example: input `i`, condition `i > 3`. |
 | **Record** button | Consented UI-authoring metadata capture; pause/resume/stop/export. Selenium browser recording is explicitly pending, not faked. |
 | Browser / debugger / timeline | Clearly labelled fixture browser; one recorded demo event clock synchronizes graph states, logs and outputs. Real browser frames, network evidence and webpage perception remain pending. |
-| History / persistence | Read-only historical graph snapshots, replay without infrastructure actions, local Save/Load, bounded undo/redo and persisted panel dimensions. |
+| History / persistence | Read-only historical graph snapshots, replay without infrastructure actions, backend-validated Save/Load DAG, separate local drafts/layout, bounded undo/redo and persisted panel dimensions. |
 
 **Python-first functional DAG:** every canvas item now has a typed Python `Task`, explicit dependencies/routes, parameters, implementation text and loop-body scope. Uses existing stdlib **dataclasses + graphlib.TopologicalSorter**. Open **Task DAG** in the inspector or **DAG** in the canvas toolbar. Export Python functionality and JSON layout separately; safe Python/spec imports and plans do not execute handlers. [Framework choice, examples and CLI](docs/PYTHON_DAG.md). The DEMO/Triage overlap and full-width canvas constraints are also fixed structurally; visual browser acceptance remains pending.
 

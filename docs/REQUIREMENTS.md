@@ -34,3 +34,8 @@ Reuse useful existing policy, browser, trace and monitoring code. Do not expand 
 The existing daily project-work cron implements/tests these requirements. Its development cadence is separate from the eventual per-chart monitoring cadence. It must not install a live five-minute production job.
 
 Repository: `orionnelson/llm-bot-selenium`. Work in feature branches and PRs targeting `blue-master`; auto-merge only tested exact heads after checks pass. Releases into `main` remain human-controlled. Every PR includes a concise summary, architecture diagram, file walkthrough, test evidence and limitations. Email concise work/PR reports to `me@or9.ca` only through a verified transport; otherwise save the report and record the delivery blocker.
+
+
+## Owner architecture direction — 2026-10-21
+
+DAG → UI, not UI → DAG. The existing Python DAG is authoritative for backend functionality; the UI renders it and proposes edits. Keep layout separate, validate/persist backend-side, reject stale/invalid changes without losing drafts, and use Ponytail's smallest complete implementation. Do not infer task execution, browser/production consent or scheduling from a valid static plan.
