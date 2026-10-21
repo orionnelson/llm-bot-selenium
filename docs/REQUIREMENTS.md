@@ -39,3 +39,8 @@ Repository: `orionnelson/llm-bot-selenium`. Work in feature branches and PRs tar
 ## Owner architecture direction — 2026-10-21
 
 DAG → UI, not UI → DAG. The existing Python DAG is authoritative for backend functionality; the UI renders it and proposes edits. Keep layout separate, validate/persist backend-side, reject stale/invalid changes without losing drafts, and use Ponytail's smallest complete implementation. Do not infer task execution, browser/production consent or scheduling from a valid static plan.
+
+
+## Owner 2026-10-21: connect the missing browser loop
+
+Implement the saved DAG→approved URL→page-grounded LLM proposal→guarded Selenium action→recorded outcome/replay path in test state. Require explicit URL/control/capture consent, stale-page and canonical-revision checks, visible evidence (not model claims), cancellation/cleanup and private reusable recording export. Do not execute generated Python or infer permission for real SRE/private-site recording or production mutation. Live Grid/model/browser acceptance must be verified independently of simulated drivers.

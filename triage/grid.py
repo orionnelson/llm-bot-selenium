@@ -34,15 +34,19 @@ def create_driver(url):
                             client_config=ClientConfig(remote_server_addr=url, timeout=30))
 
 
+def verify_sandbox(driver):
+    args = driver.execute_cdp_cmd('Browser.getBrowserCommandLine', {})['arguments']
+    if any(arg.split('=')[0] in ('--no-sandbox', '--disable-setuid-sandbox') for arg in args):
+        raise ValueError('Unsafe Grid browser: sandbox disabled')
+
+
 def smoke(url):
     if not status(url)['ready']:
         raise ValueError('Grid is not ready')
     driver = create_driver(url)
     try:
         driver.set_page_load_timeout(10)
-        args = driver.execute_cdp_cmd('Browser.getBrowserCommandLine', {})['arguments']
-        if any(arg.split('=')[0] in ('--no-sandbox', '--disable-setuid-sandbox') for arg in args):
-            raise ValueError('Unsafe Grid browser: sandbox disabled')
+        verify_sandbox(driver)
         driver.get('data:text/html,<title>Synthetic Grid check</title><h1>grid-ok</h1>')
         if driver.title != 'Synthetic Grid check':
             raise ValueError('Synthetic page was not loaded')

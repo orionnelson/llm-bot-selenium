@@ -23,6 +23,7 @@ spec:
             - {containerPort: 4444}
           env:
             - {name: SE_NODE_MAX_SESSIONS, value: '1'}
+            - {name: SE_NODE_SESSION_TIMEOUT, value: '300'}
             # Bypass the image's --no-sandbox shell wrapper, not the browser sandbox.
             - {name: SE_BROWSER_BINARY_LOCATION, value: /opt/google/chrome/chrome}
             - {name: SE_ENABLE_TRACING, value: 'false'}
@@ -37,7 +38,28 @@ spec:
             periodSeconds: 10
           volumeMounts:
             - {name: shm, mountPath: /dev/shm}
+        - name: fixture
+          image: python:3.11-slim-bookworm
+          command: [python, -m, http.server, '8080', --bind, 127.0.0.1, --directory, /fixture]
+          env:
+            - {name: PYTHONDONTWRITEBYTECODE, value: '1'}
+          securityContext:
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          readinessProbe:
+            exec:
+              command: [python, -c, 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8080/", timeout=2).close()']
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          volumeMounts:
+            - {name: fixture, mountPath: /fixture, readOnly: true}
       volumes:
+        - name: fixture
+          configMap: {name: selenium-grid-fixture}
         - name: shm
           emptyDir: {medium: Memory, sizeLimit: 2Gi}
 ---

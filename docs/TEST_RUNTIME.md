@@ -1,6 +1,6 @@
 # Test-state function generation and Selenium Grid
 
-The **Python DAG remains authoritative**. These opt-in test integrations do not execute generated functions or enable a production DAG/browser runner.
+The **Python DAG remains authoritative**. These opt-in test integrations do not execute generated functions or enable a production DAG/browser runner. The separate consented test-action adapter is described in BROWSER_LOOP.md.
 
 ## Start the test backend
 
@@ -13,7 +13,7 @@ SELENIUM_GRID_URL=http://selenium-grid.llms.svc.cluster.local:4444 \
 
 Open `http://127.0.0.1:3031/`. This is a **local test backend**, not the existing OpenCode/Bun static app on3001. Without `--test-mode`, generation and test-status endpoints return503. The service remains loopback-only and is not a public/authenticated multi-user deployment. It must be started in an environment with Python3.11+; the current OpenCode container has no Python runtime. A manually started process is not restart-persistent.
 
-`GET /api/test/status` reports the selected model, actual configured Grid reachability/readiness, and `execution: disabled`. A running static UI or a Grid process is not evidence of a working browser session.
+`GET /api/test/status` reports the selected model, actual configured Grid reachability/readiness, and `execution: consented-test-browser-actions` with `generatedPythonExecution: false`. A running static UI or a Grid process is not evidence of a working browser session.
 
 ## Smol Friend / Qwen3.6
 
@@ -34,7 +34,7 @@ The smallest Grid is the official **standalone Chrome Grid4** image: one server,
 An operator with cluster access can apply:
 
 ```sh
-kubectl apply -f deploy/selenium-grid.yaml
+kubectl apply -k deploy/
 ```
 
 This declares one non-root Deployment, private ClusterIP Service and synthetic-only NetworkPolicy in `llms`. No service account token, host mounts, personal profiles, privileged mode, public NodePort or browser egress. `/dev/shm` is memory-backed. Readiness probe means the Grid HTTP process is reachable, **not** a passed browser test. Keep these restrictions; do not loosen browser sandbox/security merely to pass acceptance.
@@ -68,3 +68,6 @@ flowchart LR
 A live Smol Friend request returned a contract-valid Qwen3.6 function candidate with `executed: false`; the canonical DAG hash stayed unchanged. Actual HTTP tests also cover disabled mode, canonical-task lookup, provider failures, busy generation and responsive DAG access. Constructor/cleanup tests use mocks and are **not** live Grid evidence.
 
 The new local backend was started for testing on127.0.0.1:3031. **The existing LAN app is unchanged.** Grid DNS did not resolve; Kubernetes API10.96.0.1:443 timed out; Docker, kubectl and Java are unavailable here. The Grid manifest parses as YAML but has not been API-admitted or deployed. The actual Grid probe exited2; no browser/Grid success, screenshots, production execution or restart persistence is claimed. Cluster deployment and a sandbox-capable node remain operator blockers.
+
+
+The connected browser action/recording adapter is documented in [BROWSER_LOOP.md](BROWSER_LOOP.md). Deploy with Kustomize to include the private synthetic fixture; browser egress remains denied.

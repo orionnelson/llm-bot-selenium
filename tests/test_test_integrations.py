@@ -123,7 +123,8 @@ class GenerationTests(unittest.TestCase):
             with patch.dict('os.environ', {}, clear=True):
                 status_value = request(port, path='/api/test/status')[1]
                 self.assertEqual(status_value['grid']['ready'], False)
-                self.assertEqual(status_value['execution'], 'disabled')
+                self.assertEqual(status_value['execution'], 'consented-test-browser-actions')
+                self.assertFalse(status_value['generatedPythonExecution'])
 
     def test_enabled_http_provider_failure_and_bad_inputs_do_not_save(self):
         with backend(saved(), test_mode=True) as (port, path, _):
