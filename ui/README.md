@@ -13,11 +13,15 @@ npm run preview                 # http://127.0.0.1:4173
 
 Requires Node22+ and Python3 for the cross-language artifact test. The installed demo is at `http://smol-kitten.local:32085/` on the owner's LAN, not a public GitHub deployment.
 
+## DAG-first backend
+
+For connected editing, build this UI and run `python -m triage.dag_server --dag runtime/workflow_dag.py` from the repository root with an existing safe Python definition. [Initialization, API, architecture and limits](../docs/PYTHON_DAG.md#dag--ui-backend-authoritative-direction). The backend owns functionality; the canvas is its editable projection. Save submits a revision-checked proposal, and Load DAG reloads the authoritative model. Standalone Vite/preview/static hosts remain offline drafts; no live execution is implied.
+
 ## Individual components
 
 | Component | Purpose and behavior |
 |---|---|
-| Top navigation | Editable project name; local Save; Run demo; **Record**; Schedule/Share explain their backend boundaries. |
+| Top navigation | Editable draft name; backend-validated Save (local-only when offline); Run demo; **Record**; Schedule/Share explain their backend boundaries. |
 | Component library | Search actions/integrations; drag or click to create nodes. Templates restores the base graph. |
 | Workflow canvas | React Flow pan/zoom/minimap, snapping, drag/connect and click-connect, conditional Yes/No ports, delete and duplicate; ELK auto-layout loads on demand. |
 | Node inspector | Target/region/metrics configuration, explicit Connect to control, prompt, outputs, error policies and **Python** implementation. |
