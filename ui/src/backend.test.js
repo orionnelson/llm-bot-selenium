@@ -22,8 +22,21 @@ beforeAll(async()=>{
 from pathlib import Path
 import sys
 from triage.dag_server import handler
+from triage import test_codegen
+model_ready=False
+def model_api(path,payload=None):
+ global model_ready
+ if path=='/v1/models':return {'data':[{'id':test_codegen.MODEL,'status':{'value':'loaded' if model_ready else 'unloaded'}}]}
+ if path=='/models/load':
+  model_ready=True
+  return {'status':'ok'}
+ if path=='/models/unload':
+  model_ready=False
+  return {'status':'ok'}
+ return {'model':test_codegen.MODEL,'choices':[{'finish_reason':'stop','message':{'content':'def run(inputs, context=None):\\n    return {\"status\": \"pending\"}\\n'}}]}
+test_codegen.smol=model_api
 root=Path(sys.argv[1])
-with HTTPServer(('127.0.0.1',0),handler(root/'dag.py',root)) as server:
+with HTTPServer(('127.0.0.1',0),handler(root/'dag.py',root,test_mode=True)) as server:
  print(server.server_port,flush=True)
  server.serve_forever()
 `,directory],{cwd:fileURLToPath(new URL('../..',import.meta.url)),stdio:'pipe'});
@@ -79,4 +92,13 @@ it('refuses an ambiguous Python definition rather than projecting its last keywo
   await expect(loadDAG()).rejects.toThrow('DAG backend unavailable or rejected the definition (422)');
   expect(await readFile(path,'utf8')).toContain("DAG(name='Hidden', name=");
  }finally{await writeFile(path,source);}
+});
+
+it('real HTTP generation returns an inert test candidate, never changing the saved DAG',async()=>{
+ const saved=await loadDAG(),before=await readFile(join(directory,'dag.py'),'utf8');
+ const response=await fetch('/api/python/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nodeId:saved.definition.tasks[0].task_id,instructions:'Synthetic test only'})});
+ expect(response.status).toBe(200);const candidate=await response.json();
+ expect(candidate.model).toBe('Qwen3.6-35B-A3B-UD-Q4_K_M-no-think');
+ expect(candidate.review).toBe('pending');expect(candidate.executed).toBe(false);
+ expect(await readFile(join(directory,'dag.py'),'utf8')).toBe(before);
 });
