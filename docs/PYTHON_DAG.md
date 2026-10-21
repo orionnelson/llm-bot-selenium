@@ -119,7 +119,7 @@ python -m triage.dag workflow_dag.py --format plan
 python -m triage.dag workflow.dag.json --output workflow_dag.py
 ```
 
-The safe `.py` loader uses Python **AST** with an allowlist: literal values and keyword-only `DAG`, `Task`, `LoopSpec`, `PythonSource` constructors; the known import declaration; `dag = ...`; and `dag.validate()`. Submitted imports, arbitrary calls, comprehensions, attribute access, expansions and executable statements are rejected. It never uses `eval`, `exec` or imports submitted code. Handler strings are preserved, not run. This restricted declarative format intentionally does not accept arbitrary Airflow-style Python builder scripts.
+The safe `.py` loader uses Python **AST** with an allowlist: literal values and keyword-only `DAG`, `Task`, `LoopSpec`, `PythonSource` constructors; the known import declaration; `dag = ...`; and `dag.validate()`. Submitted imports, arbitrary calls, comprehensions, attribute access, expansions and executable statements are rejected. It never uses `eval`, `exec` or imports submitted code. Duplicate constructor keywords are rejected before construction, rather than silently taking the last value; see [regression evidence](DAG_KEYWORD_QA.md). Handler strings are preserved, not run. This restricted declarative format intentionally does not accept arbitrary Airflow-style Python builder scripts.
 
 The earlier `triage.studio_python` exporter remains as a compatibility helper for review-only handler files; `triage.dag` and the UI's primary Py/DAG exports are the functional DAG interface.
 

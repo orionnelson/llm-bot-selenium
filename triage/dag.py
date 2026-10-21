@@ -183,6 +183,8 @@ def load_python(source):
             if any(not isinstance(k, str) for k in keys) or len(keys) != len(set(keys)): raise ValueError('Invalid/duplicate dictionary keys')
             return dict(zip(keys, [decode(v, depth+1) for v in node.values]))
         if isinstance(node, ast.Call) and isinstance(node.func, ast.Name) and node.func.id in constructors and not node.args and all(k.arg for k in node.keywords):
+            if len({k.arg for k in node.keywords}) != len(node.keywords):
+                raise ValueError('Duplicate constructor keyword in DAG definition')
             return constructors[node.func.id](**{k.arg: decode(k.value, depth+1) for k in node.keywords})
         raise ValueError('Only literal values and DAG/Task/LoopSpec/PythonSource constructors are accepted')
     dag = None
