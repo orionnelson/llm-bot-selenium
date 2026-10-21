@@ -6,3 +6,7 @@ artifacts/
 
 # Local authoritative editor state is not source code.
 runtime/workflow_dag.py
+
+runtime/browser-recordings/
+
+runtime/backend.pid

@@ -17,6 +17,10 @@ Requires Node22+ and Python3 for the cross-language artifact test. The installed
 
 For connected editing, build this UI and run `python -m triage.dag_server --dag runtime/workflow_dag.py` from the repository root with an existing safe Python definition. [Initialization, API, architecture and limits](../docs/PYTHON_DAG.md#dag--ui-backend-authoritative-direction). The backend owns functionality; the canvas is its editable projection. Save submits a revision-checked proposal, and Load DAG reloads the authoritative model. Standalone Vite/preview/static hosts remain offline drafts; no live execution is implied.
 
+## Connected Grid actions and replay
+
+Default **Run & Record** loads the selected task policy from the canonical backend, not unsaved canvas config. Approve the displayed saved URL/control/capture boundary, then start a bounded asynchronous test run, cancel, inspect selected-action frames, export native triage metadata, or play an optional action-frame WebM (not continuous video). Backend status/real Grid readiness remain separate from old DEMO fixture playback. [Policy, setup, API and actual deployment limits](../docs/BROWSER_LOOP.md).
+
 ## Individual components
 
 | Component | Purpose and behavior |

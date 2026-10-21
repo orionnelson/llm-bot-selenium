@@ -24,9 +24,11 @@ def snapshot(path):
             'revision': hashlib.sha256(source).hexdigest()}
 
 
-def handler(dag_path, assets, *, test_mode=False):
+def handler(dag_path, assets, *, test_mode=False, recordings=None):
     """One trusted server-side definition path; clients cannot select filesystem paths."""
     dag_lock, generation_lock = Lock(), Lock()
+    from .browser_loop import BrowserRuns
+    browser_runs = BrowserRuns(recordings or dag_path.parent / 'browser-recordings', generation_lock, lambda: snapshot(dag_path)['revision']) if test_mode else None
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(assets), **kwargs)
@@ -41,6 +43,8 @@ def handler(dag_path, assets, *, test_mode=False):
         def end_headers(self):
             self.send_header('Cache-Control', 'no-store')
             self.send_header('X-Content-Type-Options', 'nosniff')
+            self.send_header('Cross-Origin-Resource-Policy', 'same-origin')
+            self.send_header('Referrer-Policy', 'no-referrer')
             self.send_header('Content-Security-Policy', "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'")
             super().end_headers()
 
@@ -61,6 +65,30 @@ def handler(dag_path, assets, *, test_mode=False):
         def do_GET(self):
             if not self.local_request():
                 return self.reply(403, {'error': 'Local same-origin requests only'})
+            if urlsplit(self.path).path.startswith('/api/browser/runs'):
+                if not browser_runs:
+                    return self.reply(503, {'error': 'Test browser execution disabled'})
+                parts = urlsplit(self.path).path.strip('/').split('/')
+                try:
+                    if parts == ['api', 'browser', 'runs']:
+                        return self.reply(200, browser_runs.listing())
+                    if len(parts) not in (4,5): raise ValueError('Invalid recording route')
+                    value = browser_runs.read(parts[3])  # Validates the opaque run ID.
+                    if len(parts) == 4: return self.reply(200, value)
+                    name = parts[4]
+                    if name not in {u.rsplit('/',1)[-1] for u in value['frames']} | ({'actions.webm'} if value.get('video') else set()):
+                        raise ValueError('Unknown recording asset')
+                    path = (browser_runs.root / parts[3] / name).resolve()
+                    if not path.is_relative_to(browser_runs.root.resolve()) or not path.is_file() or path.stat().st_size > 10485760:
+                        raise ValueError('Invalid recording asset')
+                    body = path.read_bytes()
+                    self.send_response(200)
+                    self.send_header('Content-Type', 'image/png' if name.endswith('.png') else 'video/webm')
+                    self.send_header('Content-Length', str(len(body)))
+                    self.end_headers(); self.wfile.write(body)
+                    return
+                except (ValueError, OSError, KeyError):
+                    return self.reply(404, {'error': 'Recording not found'})
             if urlsplit(self.path).path == '/api/test/status':
                 if not test_mode:
                     return self.reply(503, {'error': 'Test integrations disabled'})
@@ -72,7 +100,7 @@ def handler(dag_path, assets, *, test_mode=False):
                         grid = {**status(os.environ['SELENIUM_GRID_URL']), 'status': 'reachable'}
                     except Exception:
                         grid = {'ready': False, 'status': 'unreachable or invalid'}
-                return self.reply(200, {'mode': 'test', 'generator': MODEL, 'grid': grid, 'execution': 'disabled'})
+                return self.reply(200, {'mode': 'test', 'generator': MODEL, 'grid': grid, 'execution': 'consented-test-browser-actions', 'generatedPythonExecution': False, 'modelBusy': generation_lock.locked()})
             if urlsplit(self.path).path == '/api/dag':
                 try:
                     return self.reply(200, snapshot(dag_path))
@@ -92,6 +120,32 @@ def handler(dag_path, assets, *, test_mode=False):
             self.close_connection = True
             if not self.local_request():
                 return self.reply(403, {'error': 'Local same-origin requests only'})
+            if self.path.startswith('/api/browser/runs'):
+                if not browser_runs:
+                    return self.reply(503, {'error': 'Test browser execution disabled'})
+                parts = self.path.strip('/').split('/')
+                try:
+                    if len(parts) == 5 and parts[:3] == ['api','browser','runs'] and parts[4] == 'cancel':
+                        return self.reply(202, browser_runs.cancel(parts[3]))
+                    if parts != ['api','browser','runs']: return self.reply(404, {'error': 'Not found'})
+                    if self.headers.get_content_type() != 'application/json' or self.headers.get('Transfer-Encoding'):
+                        return self.reply(415, {'error': 'Send bounded application/json'})
+                    size = int(self.headers.get('Content-Length','0'))
+                    if not 0 < size <= 4096: return self.reply(413, {'error': 'Browser request exceeds bounds'})
+                    payload = json.loads(self.rfile.read(size))
+                    if not isinstance(payload,dict) or set(payload) != {'nodeId','consent','video'} or not isinstance(payload['nodeId'],str):
+                        raise ValueError('Expected task ID, consent and video choice')
+                    current = snapshot(dag_path)
+                    if self.headers.get('If-Match') != current['revision']:
+                        return self.reply(409, {'error': 'DAG changed; reload the saved task before approval'})
+                    value = browser_runs.start(DAG.from_spec(current['definition']), current['revision'], payload['nodeId'], payload['consent'], payload['video'])
+                    return self.reply(202, value)
+                except BlockingIOError:
+                    return self.reply(429, {'error': 'Model or browser operation already active'})
+                except (ValueError, TypeError, KeyError, SyntaxError, RecursionError):
+                    return self.reply(400, {'error': 'Invalid saved browser policy or missing explicit consent'})
+                except OSError:
+                    return self.reply(503, {'error': 'Grid, recording storage or requested video is unavailable; no browser started'})
             if self.path != '/api/python/generate':
                 return self.reply(404, {'error': 'Not found'})
             if not test_mode:
@@ -173,14 +227,16 @@ def main():
     parser.add_argument('--assets', type=Path, default=Path('ui/dist'))
     parser.add_argument('--port', type=int, default=3001)
     parser.add_argument('--test-mode', action='store_true', help='Enable review-only local Smol Friend generation and Grid status')
+    parser.add_argument('--recordings', type=Path, help='Private bounded browser recording directory')
     args = parser.parse_args()
     try:
         snapshot(args.dag)  # Never seed missing/invalid definitions from browser state.
     except (OSError, ValueError, TypeError, KeyError, SyntaxError, RecursionError, AttributeError):
         parser.error('Server DAG is missing or invalid; no fallback definition loaded')
     # shortcut: one local process owns this file; add locking before multi-worker hosting.
-    with ThreadingHTTPServer(('127.0.0.1', args.port), handler(args.dag.resolve(), args.assets.resolve(), test_mode=args.test_mode)) as server:
-        print(f'DAG editor: http://127.0.0.1:{server.server_port} (planning only)', flush=True)
+    with ThreadingHTTPServer(('127.0.0.1', args.port), handler(args.dag.resolve(), args.assets.resolve(), test_mode=args.test_mode, recordings=args.recordings)) as server:
+        mode = 'consented browser tests; generated Python disabled' if args.test_mode else 'planning only'
+        print(f'DAG editor: http://127.0.0.1:{server.server_port} ({mode})', flush=True)
         server.serve_forever()
 
 

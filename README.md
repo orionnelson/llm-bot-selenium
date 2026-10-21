@@ -2,9 +2,15 @@
 
 Help an SRE investigate an issue by understanding what they see in their browser—then reuse their validated checks for release monitoring. This complements the existing log-analysis tool; it does not replace it.
 
+## Connected browser actions and recording
+
+The **Run & Record** workspace now connects a saved DAG task to an approved Grid URL, a grounded local-Qwen proposal, a guarded Selenium click and a visible-result assertion. It records private before/after region frames and timestamped action provenance, supports cancellation/reusable triage export, and can export a clearly labelled action-frame WebM. No generated Python executes. [Setup, policy, API, real-vs-simulated evidence and infrastructure gate](docs/BROWSER_LOOP.md).
+
+The implementation is present; **real Grid deployment/browser acceptance is still blocked in this environment**. The existing LAN/static app is not silently upgraded. Operator setup uses `kubectl apply -k deploy/` to include the private test fixture without allowing browser egress.
+
 ## DAG-first Workflow Studio — SRE Flow Builder
 
-The canonical Python DAG now drives the canvas through a minimal validation/storage backend. [Run the backend + UI](docs/PYTHON_DAG.md#dag--ui-backend-authoritative-direction). It plans but never executes tasks. The existing LAN static demo is unchanged.
+The canonical Python DAG now drives the canvas through a minimal validation/storage backend. [Run the backend + UI](docs/PYTHON_DAG.md#dag--ui-backend-authoritative-direction). Static plans never execute tasks. The separate consented test-browser adapter uses fixed allowlisted Selenium tools, never generated Python. The existing LAN static demo is unchanged.
 
 The editable frontend lives in **[`ui/`](ui/README.md)**. Start with `cd ui && npm ci --include=dev && npm run dev` (Node22+ and Python3 for artifact tests). The owner-hosted LAN demo is `http://smol-kitten.local:32085/`; it is not a public hosted service.
 
@@ -14,7 +20,7 @@ The editable frontend lives in **[`ui/`](ui/README.md)**. Start with `cd ui && n
 | Node inspector | Edit targets, prompt, outputs and retry settings. Source is saved with each node. |
 | **Python** tab | Config→Python starters, editable per-node `run(inputs, context=None)`, provenance/review, `.py` export and optional authenticated LLM code generation. Example: input `i`, condition `i > 3`. |
 | **Record** button | Consented UI-authoring metadata capture; pause/resume/stop/export. Selenium browser recording is explicitly pending, not faked. |
-| Browser / debugger / timeline | Clearly labelled fixture browser; one recorded demo event clock synchronizes graph states, logs and outputs. Real browser frames, network evidence and webpage perception remain pending. |
+| Browser / debugger / timeline | Separate Run & Record UI for consented Grid tasks and private action frames; old fixture/demo clock remains explicitly separate. Actual Grid/browser acceptance is still pending. |
 | History / persistence | Read-only historical graph snapshots, replay without infrastructure actions, backend-validated Save/Load DAG, separate local drafts/layout, bounded undo/redo and persisted panel dimensions. |
 
 **Python-first functional DAG:** every canvas item now has a typed Python `Task`, explicit dependencies/routes, parameters, implementation text and loop-body scope. Uses existing stdlib **dataclasses + graphlib.TopologicalSorter**. Open **Task DAG** in the inspector or **DAG** in the canvas toolbar. Export Python functionality and JSON layout separately; safe Python/spec imports and plans do not execute handlers. [Framework choice, examples and CLI](docs/PYTHON_DAG.md). The DEMO/Triage overlap and full-width canvas constraints are also fixed structurally; visual browser acceptance remains pending.
@@ -25,7 +31,7 @@ The frontend never runs custom or generated Python. The Python counterpart [`tri
 
 **Screenshots: blocked in this runtime, not fabricated.** Chromium cannot start with a usable sandbox and an alternate browser download timed out. [`ui/scripts/capture_screenshots.py`](ui/scripts/capture_screenshots.py) captures actual workspace, Python-inspector and recording-dialog PNGs on a sandbox-capable loopback environment. No empty/broken screenshot links or illustrations are presented as real screenshots. See the [component-by-component guide and capture instructions](ui/README.md).
 
-**Local checks:** 95 frontend tests passed, including real-Python parsing of frontend-generated artifacts; TypeScript/Vite build passed. Python regression suite: 97 tests run, 95 passed and 2 actual-browser tests skipped. No live Selenium recording, LLM inference, production infrastructure execution or visual screenshot acceptance is claimed.
+**Local checks:**137frontend tests and TypeScript/Vite build pass.147Python tests run:144passed,3real-browser/Grid checks skipped. Actual Qwen completed the action controller with a simulated WebDriver; actual ffmpeg exported simulated action frames. Real Grid/browser/UI acceptance and production execution are not claimed.
 
 ### Offline CLI page seeds
 

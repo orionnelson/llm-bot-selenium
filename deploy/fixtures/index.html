@@ -1,0 +1,11 @@
+<!doctype html><meta charset="utf-8"><title>Synthetic release dashboard</title>
+<style>body{font:18px system-ui;background:#eef4f5;color:#18373d;padding:24px}main{background:white;padding:24px;border-radius:12px;max-width:900px}button,a{display:inline-block;margin:12px;padding:12px} [data-private]{color:red}</style>
+<p>CONSENTED SYNTHETIC FIXTURE — no real account or credentials.</p>
+<main data-sre-observe>
+<h1>Release dashboard</h1><p>Inspect the errors chart to verify the release.</p>
+<button type="button" data-sre-action="show-errors" data-sre-safe="true" onclick="document.querySelector('[data-sre-result]').hidden=false;this.disabled=true">View errors</button>
+<a data-sre-action="open-details" data-sre-safe="true" href="/details.html">Open service details</a>
+<p hidden data-sre-result="errors">Errors: 0</p>
+<div data-private>FAKE_PRIVATE_VALUE_MUST_NOT_BE_CAPTURED</div>
+<form><label>Private fake field<input type="password" value="NOT_A_REAL_PASSWORD"></label></form>
+</main>

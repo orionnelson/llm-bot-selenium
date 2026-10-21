@@ -1,0 +1,12 @@
+import { parseSession, type TriageSession } from './snippets';
+export interface BrowserStep { id:string;action:'click';candidate:string;label:string;locator:string;url:string;evidence:string;state:string;before:string;after?:string;videoMs:number }
+export interface BrowserRun { version:'browser-run/v1';id:string;taskId:string;status:string;evidenceKind:string;startedAt:string;url:string;model:string;modelCalls:number;frames:string[];steps:BrowserStep[];triage:TriageSession;video?:{url:string;kind:'action-frames';frameMs:number};verifiedResult?:string;error?:string;reason?:string }
+export const activeRun=(r:BrowserRun)=>['queued','running','cancelling'].includes(r.status);
+const validId=(id:string)=>{if(!/^[0-9a-f]{32}$/.test(id))throw Error('Invalid recording ID');return id;};
+export function recordingAsset(url:string){if(!/^\/api\/browser\/runs\/[0-9a-f]{32}\/(frame-\d{2}\.png|actions\.webm)$/.test(url))throw Error('Invalid private recording asset');return url;}
+export function parseRun(value:unknown):BrowserRun {const r=value as BrowserRun;if(!r||r.version!=='browser-run/v1'||typeof r.status!=='string'||!Array.isArray(r.frames)||!Array.isArray(r.steps))throw Error('Invalid browser recording');validId(r.id);r.frames.forEach(recordingAsset);if(r.video)recordingAsset(r.video.url);r.steps.forEach(s=>{recordingAsset(s.before);if(s.after)recordingAsset(s.after);});return {...r,triage:parseSession(r.triage)};}
+async function request(path:string,init?:RequestInit){const response=await fetch(path,{...init,cache:'no-store',signal:AbortSignal.timeout(10000)});const body=await response.json();if(!response.ok)throw Error(body.error||`Browser backend error ${response.status}`);return body;}
+export async function browserHistory():Promise<BrowserRun[]>{const value=await request('/api/browser/runs');if(!Array.isArray(value))throw Error('Invalid recording history');return value.map(parseRun);}
+export async function browserRun(id:string):Promise<BrowserRun>{return parseRun(await request('/api/browser/runs/'+validId(id)));}
+export async function startBrowserRun(nodeId:string,revision:string,consent:boolean,video:boolean):Promise<string>{const value=await request('/api/browser/runs',{method:'POST',headers:{'Content-Type':'application/json','If-Match':revision},body:JSON.stringify({nodeId,consent,video})});return validId(value.id);}
+export async function cancelBrowserRun(id:string){return request('/api/browser/runs/'+validId(id)+'/cancel',{method:'POST'});}
