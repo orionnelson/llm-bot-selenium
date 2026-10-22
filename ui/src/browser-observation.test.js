@@ -67,6 +67,17 @@ describe('consented observation text (simulated DOM)', () => {
     expect(value.incomplete).toBe(true);
     expect(JSON.stringify(value)).not.toContain('IGNORED');
   });
+  it.each(['result', 'label', 'page'].flatMap(kind => ['single-node', 'later-node'].map(shape => [kind, shape])))('flags character-truncated %s evidence (%s)', (kind, shape) => {
+    const attrs = kind === 'result' ? { 'data-sre-result': 'errors' }
+      : kind === 'label' ? { 'data-sre-action': 'show-errors', 'data-sre-safe': 'true' } : {};
+    const max = kind === 'label' ? 120 : kind === 'result' ? 501 : 8000;
+    const prefix = (kind === 'label' ? 'View errors' : 'Errors: 0').padEnd(max, ' ');
+    const suffix = 'delete deployment / failures still loading';
+    const children = shape === 'single-node' ? [prefix + suffix] : [prefix, suffix];
+    expect(observe(element(kind === 'label' ? 'button' : 'div', attrs, children)).incomplete).toBe(true);
+    // Exactly the boundary, with no discarded evidence, remains complete.
+    expect(observe(element(kind === 'label' ? 'button' : 'div', attrs, [prefix])).incomplete).toBe(false);
+  });
   it('allows exactly the text-node budget without an incomplete false positive', () => {
     const value = observe(element('div', { 'data-sre-result': 'errors' }, [
       'Errors: 0', ...Array.from({ length: 4999 }, () => element('span', { 'data-private': '' }, ['IGNORED'])),

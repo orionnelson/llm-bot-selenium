@@ -37,7 +37,7 @@ const visible=e=>!e.closest(ignore+', [hidden], [aria-hidden="true"]') &&
  (e.checkVisibility ? e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}) : e.getClientRects().length>0);
 let incomplete=false;
 // Use the same consent filter for every string sent to the model or persisted as evidence.
-const text=(e,max,budget)=>{const w=document.createTreeWalker(e,NodeFilter.SHOW_TEXT),t=[];let n,i=0;while((n=w.nextNode())&&i++<budget){if(visible(n.parentElement))t.push(n.textContent);if(t.join(' ').length>=max)break;}if(n&&i>budget)incomplete=true;return t.join(' ').replace(/\s+/g,' ').trim().slice(0,max)};
+const text=(e,max,budget)=>{const w=document.createTreeWalker(e,NodeFilter.SHOW_TEXT),t=[];let n,i=0;while((n=w.nextNode())&&i++<budget){if(visible(n.parentElement))t.push(n.textContent);if(t.join(' ').length>max){incomplete=true;break;}}if(n&&i>budget)incomplete=true;return t.join(' ').replace(/\s+/g,' ').trim().slice(0,max)};
 const candidates=Array.from(root.querySelectorAll('[data-sre-action]')).slice(0,100)
  .filter(e=>visible(e)&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&e.getAttribute('data-sre-safe')==='true')
  .map(e=>({id:e.getAttribute('data-sre-action'),label:text(e,120,500),tag:e.tagName.toLowerCase(),href:e.tagName==='A'?e.href:null}));
@@ -87,7 +87,7 @@ def observe(driver, policy, urls):
     root = roots[0]
     value = driver.execute_script(OBSERVE, root, policy['expected']['id'])
     if value.get('private'): raise BrowserBlocked('Observation root is private')
-    if value.get('incomplete'): raise BrowserBlocked('Observation text traversal budget exhausted')
+    if value.get('incomplete'): raise BrowserBlocked('Observation text budget exhausted')
     candidates, seen = [], set()
     for c in value['candidates']:
         if c['id'] not in policy['allowed_actions']:
