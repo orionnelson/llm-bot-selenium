@@ -35,13 +35,14 @@ const root=arguments[0], ignore='input,textarea,select,form,[contenteditable],[d
 if(root.closest(ignore))return {private:true};
 const visible=e=>!e.closest(ignore+', [hidden], [aria-hidden="true"]') &&
  (e.checkVisibility ? e.checkVisibility({checkOpacity:true,checkVisibilityCSS:true}) : e.getClientRects().length>0);
+let incomplete=false;
 // Use the same consent filter for every string sent to the model or persisted as evidence.
-const text=(e,max,budget)=>{const w=document.createTreeWalker(e,NodeFilter.SHOW_TEXT),t=[];let n,i=0;while((n=w.nextNode())&&i++<budget){if(visible(n.parentElement))t.push(n.textContent);if(t.join(' ').length>=max)break;}return t.join(' ').replace(/\s+/g,' ').trim().slice(0,max)};
+const text=(e,max,budget)=>{const w=document.createTreeWalker(e,NodeFilter.SHOW_TEXT),t=[];let n,i=0;while((n=w.nextNode())&&i++<budget){if(visible(n.parentElement))t.push(n.textContent);if(t.join(' ').length>=max)break;}if(n&&i>budget)incomplete=true;return t.join(' ').replace(/\s+/g,' ').trim().slice(0,max)};
 const candidates=Array.from(root.querySelectorAll('[data-sre-action]')).slice(0,100)
  .filter(e=>visible(e)&&!e.disabled&&e.getAttribute('aria-disabled')!=='true'&&e.getAttribute('data-sre-safe')==='true')
  .map(e=>({id:e.getAttribute('data-sre-action'),label:text(e,120,500),tag:e.tagName.toLowerCase(),href:e.tagName==='A'?e.href:null}));
 const results=root.querySelectorAll('[data-sre-result="'+arguments[1]+'"]');
-return {text:text(root,8000,5000),candidates,result:results.length===1&&visible(results[0])?text(results[0],501,5000):null};
+return {text:text(root,8000,5000),candidates,result:results.length===1&&visible(results[0])?text(results[0],501,5000):null,incomplete};
 """
 MASK = """
 const s=document.createElement('style');s.textContent='[data-sre-observe]:is(form,input,textarea,select,[contenteditable],[data-private]){visibility:hidden!important} [data-sre-observe] input,[data-sre-observe] textarea,[data-sre-observe] select,[data-sre-observe] form,[data-sre-observe] [contenteditable],[data-sre-observe] [data-private]{visibility:hidden!important} [data-sre-observe]{max-width:1280px!important;max-height:900px!important;overflow:hidden!important}';document.head.appendChild(s);return s;
@@ -86,6 +87,7 @@ def observe(driver, policy, urls):
     root = roots[0]
     value = driver.execute_script(OBSERVE, root, policy['expected']['id'])
     if value.get('private'): raise BrowserBlocked('Observation root is private')
+    if value.get('incomplete'): raise BrowserBlocked('Observation text traversal budget exhausted')
     candidates, seen = [], set()
     for c in value['candidates']:
         if c['id'] not in policy['allowed_actions']:

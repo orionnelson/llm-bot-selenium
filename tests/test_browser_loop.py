@@ -181,6 +181,31 @@ class BrowserLoopTests(unittest.TestCase):
             self.assertEqual(driver.clicks, [])
             self.assertEqual(driver.quits, 1)
 
+    def test_incomplete_dom_evidence_cannot_pass_before_or_after_an_action(self):
+        for phase in (1, 2, 3):  # Initial read, pre-click recheck, post-click verification.
+            with self.subTest(phase=phase):
+                driver = FakeDriver()
+                original, calls = driver.execute_script, []
+                def incomplete(script, *args):
+                    value = original(script, *args)
+                    if script == OBSERVE:
+                        calls.append(script)
+                        if len(calls) == phase:
+                            value.update(incomplete=True, result='Errors: 0')
+                    return value
+                driver.execute_script = incomplete
+                with manager(driver) as (runs, _, _), patch('triage.browser_loop.propose', side_effect=choice) as model:
+                    record = finished(runs, runs.start(browser_dag(), 'revision-1', 'browser-check', True, False))
+                    self.assertEqual(record['status'], 'blocked')
+                    self.assertNotIn('verifiedResult', record)
+                    self.assertEqual(record['modelCalls'], int(phase > 1))
+                    self.assertEqual(model.call_count, int(phase > 1))
+                    self.assertEqual(driver.frame_calls, int(phase > 1))
+                    self.assertEqual(len(driver.clicks), int(phase == 3))
+                    self.assertEqual(driver.quits, 1)
+                    if phase == 3:
+                        self.assertEqual(record['steps'][0]['state'], 'performed')
+
     def test_target_permission_is_rechecked_immediately_before_click(self):
         driver = FakeDriver()
         def changed(goal, observation):
