@@ -55,6 +55,25 @@ describe('consented observation text (simulated DOM)', () => {
       'Errors: 0', element('form', {}, ['NOT_A_REAL_PASSWORD']),
     ])).result).toBe('Errors: 0');
   });
+  it.each(['result', 'label', 'page'])('flags incomplete %s evidence when the traversal budget is exhausted', kind => {
+    const attrs = kind === 'result' ? { 'data-sre-result': 'errors' }
+      : kind === 'label' ? { 'data-sre-action': 'show-errors', 'data-sre-safe': 'true' } : {};
+    const limit = kind === 'label' ? 500 : 5000;
+    const value = observe(element(kind === 'label' ? 'button' : 'div', attrs, [
+      'Errors: 0', ...Array.from({ length: limit }, () => element('span', { 'data-private': '' }, ['IGNORED'])),
+      'but failures are still loading',
+    ]));
+    // A plausible prefix must not become a healthy assertion or a grounded action label.
+    expect(value.incomplete).toBe(true);
+    expect(JSON.stringify(value)).not.toContain('IGNORED');
+  });
+  it('allows exactly the text-node budget without an incomplete false positive', () => {
+    const value = observe(element('div', { 'data-sre-result': 'errors' }, [
+      'Errors: 0', ...Array.from({ length: 4999 }, () => element('span', { 'data-private': '' }, ['IGNORED'])),
+    ]));
+    expect(value.incomplete).toBe(false);
+    expect(value.result).toBe('Errors: 0');
+  });
   it('normalizes visible text and retains the oversized-result rejection sentinel', () => {
     expect(observe(element('div', { 'data-sre-result': 'errors' }, ['  Errors:\n 0  '])).result).toBe('Errors: 0');
     expect(observe(element('div', { 'data-sre-result': 'errors' }, ['x'.repeat(600)])).result).toHaveLength(501);
