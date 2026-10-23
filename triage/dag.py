@@ -73,6 +73,8 @@ class DAG:
             if not isinstance(t.depends_on, (tuple, list)) or any(not isinstance(p, str) for p in t.depends_on) or len(t.depends_on) != len(set(t.depends_on)) or any(p not in lookup or lookup[p].scope != t.scope or p == t.task_id for p in t.depends_on):
                 raise ValueError('Invalid dependency or dependency crosses loop scope')
             ports = {'branch': {'yes', 'no'}, 'loop': {'body', 'done'}, 'continue': set(), 'end': set()}.get(t.kind, {'next'})
+            if t.action == 'parallel' and t.kind == 'action':
+                ports = {'next'} if set(t.routes) == {'next'} else {'branch:' + target for target in t.routes.values() if isinstance(target, str)}
             if any(not isinstance(k, str) or not isinstance(v, str) for k, v in t.routes.items()) or not set(t.routes) <= ports or any(target not in lookup for target in t.routes.values()):
                 raise ValueError('Invalid route/port')
             if t.kind == 'branch':
@@ -240,7 +242,7 @@ def from_workflow(workflow):
             if action == 'loop-end':
                 if e['target'] != c.get('loopOwner') or e.get('sourceHandle') != 'continue' or e.get('targetHandle') != 'repeat': raise ValueError('Invalid loop return')
                 continue
-            port = e.get('sourceHandle') or 'next'
+            port = 'branch:' + e['target'] if action == 'parallel' else e.get('sourceHandle') or 'next'
             if port in routes: raise ValueError('Duplicate output port')
             routes[port] = e['target']
         deps = tuple(dict.fromkeys(e['source'] for e in edges if e['target'] == node_id and e.get('targetHandle') != 'repeat' and owners.get(e['source']) == scope))

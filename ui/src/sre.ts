@@ -50,7 +50,7 @@ export function validateFlow(v: unknown): Workflow {
  const done=new Set(),active=new Set();function visit(id:string){if(active.has(id))throw Error('Cycles are not supported in this template');if(done.has(id))return;active.add(id);w.edges.filter(e=>e.source===id&&!isReturn(e)).forEach(e=>visit(e.target));active.delete(id);done.add(id);}w.nodes.forEach(n=>visit(n.id));const clean=w;if(clean.snippets)clean.snippets=clean.snippets.map(validateSnippet);for(const n of clean.nodes)if(n.data.config.snippet)n.data.config.snippet=validateSnippet(n.data.config.snippet);return clean;
 }
 export function makeRun(workflow:Workflow,scenario:string):Run {
- const w=validateFlow(workflow);if(w.nodes.some(n=>n.data.config.python&&(n.data.config.python.origin!=='starter'||n.data.config.python.source!==starterPython(n))))throw Error('Custom/LLM Python is review/export only; demo execution cannot run it. Use a reviewed backend executor.');
+ const w=validateFlow(workflow);validateOutputs(w);if(w.nodes.some(n=>n.data.config.python&&(n.data.config.python.origin!=='starter'||n.data.config.python.source!==starterPython(n))))throw Error('Custom/LLM Python is review/export only; demo execution cannot run it. Use a reviewed backend executor.');
  const starts=w.nodes.filter(n=>n.data.action==='start');if(starts.length!==1)throw Error('Demo run requires exactly one Start node');
  const events:Event[]=[];const visited=new Set<string>();let ms=0,status='Success',active=starts[0];
  const emit=(n:FlowNode,state:Status,message:string,output?:Record<string,unknown>)=>{active=n;if(events.length>=2500)throw Error('Demo event budget exceeded');visited.add(n.id);events.push({id:`evt-${events.length}`,nodeId:n.id,ms:ms+=700,status:state,message,output});};
@@ -61,6 +61,7 @@ export function makeRun(workflow:Workflow,scenario:string):Run {
    if(n.id===stopAt){emit(n,'success','Demo: continue / next iteration');return true;}
    if(n.data.action==='loop-end')throw Error('Continue boundary reached outside its loop body');
    emit(n,'running',`Demo: ${n.data.label} started`);
+   if(n.data.action==='parallel'){emit(n,'waiting','Parallel plan ready; concurrent execution adapter pending');status='Pending';return false;}
    if(n.data.action==='snippet'){emit(n,'waiting','Snippet plan ready; live/recorded browser execution adapter pending');status='Pending';return false;}
    if(n.data.action==='loop'){
     const c=n.data.config.loop!;validateLoop(c);let value=c.start,count=0;
@@ -90,6 +91,12 @@ export function makeRun(workflow:Workflow,scenario:string):Run {
 }
 export function atTime(run:Run|undefined,ms:number){const states:Record<string,Status>=Object.create(null);const outputs:Record<string,Record<string,unknown>>=Object.create(null);let active='';for(const e of run?.events??[]){if(e.ms>ms)break;states[e.nodeId]=e.status;if(e.status!=='skipped')active=e.nodeId;if(e.output)outputs[e.nodeId]=e.output;}return {states,outputs,active};}
 
+// Draft rewiring may temporarily fan out; saving/exporting/running must not choose a destination silently.
+export function validateOutputs(w:Workflow):void {
+ const outputs=new Set<string>();
+ for(const e of w.edges){const parallel=w.nodes.find(n=>n.id===e.source)?.data.action==='parallel';const key=JSON.stringify([e.source,parallel?e.target:e.sourceHandle||'next']);if(outputs.has(key)){const node=w.nodes.find(n=>n.id===e.source);throw Error(`Output ${e.sourceHandle||'next'} on "${node?.data.label??e.source}" has multiple connections. Delete the unwanted connection before saving.`);}outputs.add(key);}
+}
+
 export function linkNodes(workflow:Workflow, source:string, target:string, sourceHandle:string|null=null,targetHandle:string|null=null):Workflow {
  const from=workflow.nodes.find(n=>n.id===source),to=workflow.nodes.find(n=>n.id===target);
  if(!from||!to)throw Error('Choose two existing nodes');
@@ -102,7 +109,7 @@ export function linkNodes(workflow:Workflow, source:string, target:string, sourc
  if(from.data.action==='condition'&&!['yes','no'].includes(handle!))throw Error('Choose the Yes or No branch');
  if(workflow.edges.some(e=>e.source===source&&e.target===target&&(e.sourceHandle||null)===handle))throw Error('These nodes are already linked');
  const candidate=validateFlow({...workflow,edges:[...workflow.edges,{id:uid('edge'),source,target,sourceHandle:handle,targetHandle:from.data.action==='loop-end'?'repeat':null,label:handle?.toUpperCase(),style:{stroke:handle==='no'?'#FF4D71':['body','continue'].includes(handle||'')?'#A36BFF':'#00D68F',strokeWidth:2,...(handle==='continue'?{strokeDasharray:'6 4'}:{})}}]});
- if(workflow.edges.some(e=>e.source===source&&(e.sourceHandle||null)===handle))throw Error('Output is already connected. Delete its existing connection before replacing it.');return candidate;
+ return candidate;
 }
 
 export function removeNodes(w:Workflow,ids:string[]):Workflow {const removed=new Set(ids);for(const n of w.nodes)if(removed.has(n.id)){if(n.data.action==='loop')removed.add(n.data.config.loop!.endNodeId);if(n.data.action==='loop-end')removed.add(n.data.config.loopOwner!);}return validateFlow({...w,nodes:w.nodes.filter(n=>!removed.has(n.id)),edges:w.edges.filter(e=>!removed.has(e.source)&&!removed.has(e.target))});}
