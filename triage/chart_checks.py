@@ -228,6 +228,8 @@ class ReleaseMonitor:
         self.next_due = self.plan.start + ((now - self.plan.start) // self.plan.cadence + 1) * self.plan.cadence
         try:
             view = bot.read_chart('entity-chart', self.plan.check.binding)
+            if self.stopped:
+                return None
             identifier(view.evidence_id)
             result = self.plan.check.evaluate(view, now)
             if view.evidence_id in self.seen_evidence:
@@ -236,6 +238,8 @@ class ReleaseMonitor:
             if not view.session_valid:
                 self.stop()
         except Exception:
+            if self.stopped:
+                return None
             # Transport failures have no trusted evidence. Do not leak raw exception text.
             result = {'state': 'unknown', 'evidence': None, 'uncertainty': 'chart read failed'}
         result['duplicate'] = result['state'] == self.last_state
