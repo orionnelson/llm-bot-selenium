@@ -11,3 +11,7 @@ fieldset.inspector-body{border:0;padding:0;margin:0;min-width:0}fieldset:disable
 .dag-inspector{padding:10px;font-size:10px;min-width:0}.dag-inspector>p{font-size:9px;line-height:1.6;color:var(--secondary-text)}.dag-code{background:var(--canvas);border:1px solid var(--strong);border-radius:5px;padding:10px;max-height:45vh;overflow:auto;white-space:pre;font-size:10px;line-height:1.55;tab-size:4}.dag-inspector .pending{margin-top:12px}
 
 .browser-runner{height:100%;overflow:auto;padding:14px;box-sizing:border-box;font-size:12px}.browser-runner>label{display:block;margin:10px 0;line-height:1.5}.browser-runner>button{display:block;margin:4px 0}.browser-runner pre{white-space:pre-wrap;overflow-wrap:anywhere}.browser-run-frame{display:block;max-width:100%;max-height:360px;object-fit:contain;background:#18252a}.browser-runner code{overflow-wrap:anywhere}
+
+/* Center the grab area on the left input dot instead of outside it. */
+.react-flow__edgeupdater-target{transform:translateX(12px);cursor:grab}
+.react-flow__edgeupdater-target:hover{fill:#25b9f333;stroke:var(--info)}
