@@ -79,6 +79,30 @@ class DAGServerTests(unittest.TestCase):
             self.assertNotEqual(value['revision'], saved['revision'])
             self.assertEqual(list(path.parent.glob('tmp*')), [])
 
+    def test_backend_owned_parallel_fanout_persists_and_rejects_invalid_edits(self):
+        fork = DAG('Backend fork', (
+            Task('fork', 'Parallel', 'parallel', routes={'branch:left': 'left', 'branch:right': 'right'}),
+            Task('left', 'Left', 'application', depends_on=('fork',), routes={'next': 'join'}),
+            Task('right', 'Right', 'application', depends_on=('fork',), routes={'next': 'join'}),
+            Task('join', 'Join', 'end', kind='end', depends_on=('left', 'right')),
+        ))
+        with backend(fork) as (port, path, _):
+            value = request(port)[1]
+            self.assertEqual(value['plan']['root'], ['fork', 'left', 'right', 'join'])
+            status, saved = commit(port, value['revision'], replace(fork, name='Saved fork').to_spec())
+            self.assertEqual(status, 200)
+            self.assertEqual(load_python(path.read_text()).tasks, fork.tasks)
+            self.assertEqual(saved['plan']['execution'], 'not started')
+            before = path.read_bytes()
+            for routes in ({'branch:left': 'right'}, {'next': 'left', 'branch:right': 'right'}, {'branch:left': 'left', 'duplicate': 'left'}):
+                invalid = saved['definition'].copy()
+                invalid['tasks'] = [{**t, **({'routes': routes} if t['task_id'] == 'fork' else {})} for t in saved['definition']['tasks']]
+                self.assertEqual(commit(port, saved['revision'], invalid)[0], 400)
+                self.assertEqual(path.read_bytes(), before)
+        # Previously saved one-output parallel tasks remain loadable.
+        legacy = DAG('Legacy', (Task('fork', 'Parallel', 'parallel', routes={'next': 'end'}), Task('end', 'End', 'end', kind='end', depends_on=('fork',))))
+        self.assertEqual(load_python(legacy.to_python()), legacy)
+
     def test_invalid_and_stale_commits_preserve_canonical_file(self):
         with backend() as (port, path, _):
             value = request(port)[1]

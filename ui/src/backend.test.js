@@ -102,3 +102,24 @@ it('real HTTP generation returns an inert test candidate, never changing the sav
  expect(candidate.review).toBe('pending');expect(candidate.executed).toBe(false);
  expect(await readFile(join(directory,'dag.py'),'utf8')).toBe(before);
 });
+
+it('projects and commits an authoritative Python parallel graph without losing a branch or join',async()=>{
+ const path=join(directory,'dag.py'),before=await readFile(path,'utf8');
+ const source=`from triage.dag import DAG, Task
+ dag = DAG(name='Python parallel', tasks=(
+ Task(task_id='fork', label='Parallel', action='parallel', routes={'branch:left':'left', 'branch:right':'right'}),
+ Task(task_id='left', label='Left', action='application', depends_on=('fork',), routes={'next':'join'}),
+ Task(task_id='right', label='Right', action='application', depends_on=('fork',), routes={'next':'join'}),
+ Task(task_id='join', label='Join', action='end', kind='end', depends_on=('left','right')),
+ ))`.replace('\n dag =','\ndag =').replace('\n ))','\n))');
+ try{
+  await writeFile(path,source);const canonical=await loadDAG(),view=projectDAG(canonical);
+  expect(view.edges.filter(e=>e.source==='fork')).toHaveLength(2);
+  view.name='Reviewed fork';const saved=await commitDAG(view,canonical.revision);
+  expect(saved.definition.tasks[0].routes).toEqual({'branch:left':'left','branch:right':'right'});
+  expect(saved.definition.tasks.find(t=>t.task_id==='join').depends_on.sort()).toEqual(['left','right']);
+  expect(saved.plan.execution).toBe('not started');
+  expect((await loadDAG()).revision).toBe(saved.revision);
+  expect(await readFile(path,'utf8')).toBe(saved.python);
+ }finally{await writeFile(path,before);}
+});

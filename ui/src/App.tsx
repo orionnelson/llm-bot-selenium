@@ -17,7 +17,7 @@ import { useEffect, useRef, useState, memo } from 'react';
 import { ReactFlow, Background, MiniMap, Handle, Position, useReactFlow, applyNodeChanges, type NodeProps, type Connection } from '@xyflow/react';
 import { Circle, Play, Pause, Square, Save, Share2, Clock3, Search, Maximize2, Minus, Plus, Scan, ChevronRight, ChevronDown, Hexagon, GripVertical, Download, Upload, RotateCcw, Copy, Trash2, PanelLeftClose, PanelBottomClose, ArrowLeft, ArrowRight, RefreshCw, X, LayoutGrid, GitBranch, Settings2, Check, CircleAlert, ExternalLink } from 'lucide-react';
 
-import { actions, config, template, makeRun, atTime, validateFlow, linkNodes, removeNodes, type FlowNode, type Config, type Status } from './sre';
+import { actions, config, template, makeRun, atTime, validateFlow, validateOutputs, linkNodes, removeNodes, type FlowNode, type Config, type Status } from './sre';
 import { useStudio } from './store';
 const KEY='sre-flow-template-v1';
 const stamp=(ms:number)=>`${Math.floor(ms/60000)}:${String(Math.floor(ms/1000)%60).padStart(2,'0')}`;
@@ -46,7 +46,8 @@ export default function App(){
  }
  async function loadBackend(){try{const value=await loadDAG();acceptDAG(value,useStudio.getState().workflow);notify('Loaded authoritative Python DAG. Layout remains local; no tasks executed.');}catch(e){notify(String(e));}}
  async function save(){try{
-  localStorage.setItem(KEY,JSON.stringify(validateFlow(w)));
+  validateOutputs(validateFlow(w));
+  localStorage.setItem(KEY,JSON.stringify(w));
   localStorage.setItem('sre-visual-layout/v1',JSON.stringify(layoutOnly(w)));
   localStorage.setItem('sre-demo-runs',JSON.stringify(s.history.slice(0,20)));
   if(!revision.current){notify('Draft + layout saved locally only. Load the backend DAG before committing functional changes.');return;}
