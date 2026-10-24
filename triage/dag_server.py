@@ -5,6 +5,7 @@ import hashlib
 from http.server import ThreadingHTTPServer, SimpleHTTPRequestHandler
 import json
 import os
+import shutil
 from pathlib import Path
 import tempfile
 from threading import Lock
@@ -100,7 +101,7 @@ def handler(dag_path, assets, *, test_mode=False, recordings=None):
                         grid = {**status(os.environ['SELENIUM_GRID_URL']), 'status': 'reachable'}
                     except Exception:
                         grid = {'ready': False, 'status': 'unreachable or invalid'}
-                return self.reply(200, {'mode': 'test', 'generator': MODEL, 'grid': grid, 'execution': 'consented-test-browser-actions', 'generatedPythonExecution': False, 'modelBusy': generation_lock.locked()})
+                return self.reply(200, {'mode': 'test', 'generator': MODEL, 'grid': grid, 'execution': 'consented-test-browser-actions', 'generatedPythonExecution': False, 'modelBusy': generation_lock.locked(), 'approvedUrls': sorted(browser_runs.urls), 'videoAvailable': shutil.which('ffmpeg') is not None})
             if urlsplit(self.path).path == '/api/dag':
                 try:
                     return self.reply(200, snapshot(dag_path))

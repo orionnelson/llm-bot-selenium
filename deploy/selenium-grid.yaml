@@ -18,14 +18,14 @@ spec:
         seccompProfile: {type: RuntimeDefault}
       containers:
         - name: selenium
-          image: selenium/standalone-chrome:4.51.0-20261010
+          image: selenium/standalone-edge:4.51.0-20261010
           ports:
             - {containerPort: 4444}
           env:
             - {name: SE_NODE_MAX_SESSIONS, value: '1'}
             - {name: SE_NODE_SESSION_TIMEOUT, value: '300'}
             # Bypass the image's --no-sandbox shell wrapper, not the browser sandbox.
-            - {name: SE_BROWSER_BINARY_LOCATION, value: /opt/google/chrome/chrome}
+            - {name: SE_BROWSER_BINARY_LOCATION, value: /opt/microsoft/msedge/msedge}
             - {name: SE_ENABLE_TRACING, value: 'false'}
           securityContext:
             allowPrivilegeEscalation: false
