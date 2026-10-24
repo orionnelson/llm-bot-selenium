@@ -71,8 +71,10 @@ The single backend process serializes model operations and allows one browser ru
 
 ## Evidence and remaining infrastructure gate
 
+Current Edge Grid setup and live startup evidence: [EDGE_GRID.md](EDGE_GRID.md). The public-site CLI example is a separate read-only check, not permission to run the recording/model adapter on unannotated public pages.
+
 Deterministic tests exercise the full controller/HTTP/recording/reusable-schema path with a **simulated WebDriver**: consent, policy, invented action, stale page/DAG, private root, false finish, capture failures, cancellation, sandbox refusal, capacity, restart handling and cleanup. A cross-language test passes actual Python recording output through the active TypeScript triage/snippet parser. Actual ffmpeg encodes simulated test frames; those are not real-browser screenshots.
 
 A real local Qwen inference selected a grounded action and completed the controller plus frame-video export against a **simulated WebDriver**, explicitly labelled `SIMULATED_WEBDRIVER_WITH_REAL_QWEN`. This does not pass the real-browser gate. `RUN_GRID_BROWSER_LOOP=1 python -m unittest discover -s tests -p test_browser_loop.py -v` includes the explicit real Grid+Qwen+fixture acceptance test; it must actually pass after deployment on a sandbox-capable node. Screenshots/private-mask rendering and physical UI interactions remain live-browser acceptance items.
 
-This environment still cannot reach the Kubernetes API and has no deployed Grid DNS/container runtime. The manifest has parsed/referenced-file checks, not API admission or a deployment receipt. The local test backend can serve the new UI/API, but opening an actual Grid browser remains blocked. The existing OpenCode/LAN3001 deployment is not silently replaced or publicly exposed.
+At the original implementation checkpoint, this environment could not reach the Kubernetes API and had no deployed Grid DNS/container runtime. The manifest has parsed/referenced-file checks, not API admission or a deployment receipt. The local test backend can serve the new UI/API, but opening an actual Grid browser remains blocked. The existing OpenCode/LAN3001 deployment is not silently replaced or publicly exposed.

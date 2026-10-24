@@ -105,3 +105,7 @@ Tested feature PRs auto-merge into `blue-master`. Releases into `main` remain hu
 ## Test-mode generator and Selenium Grid
 
 Opt-in backend generation uses Smol Friend **Qwen3.6-35B-A3B Q4**, returning review-only candidates for saved DAG tasks. A private single-instance Selenium Grid manifest and synthetic smoke CLI are included. [Run instructions, actual evidence and deployment blockers](docs/TEST_RUNTIME.md). Existing LAN/static hosting is not silently upgraded; no generated code or real-site workflow is executed.
+
+### Edge Selenium Grid
+
+The remote test/browser-action path uses Microsoft Edge. See [Edge Grid integration](docs/EDGE_GRID.md) for the deployment, opt-in integration tests, and explicit read-only `https://or9.ca/` example. No local Edge/driver installation is needed for this path.

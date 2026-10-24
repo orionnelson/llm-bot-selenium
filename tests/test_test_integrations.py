@@ -223,14 +223,15 @@ class GridTests(unittest.TestCase):
         with patch('selenium.webdriver.Remote') as remote:
             self.assertIs(create_driver('http://selenium:4444'), remote.return_value)
         options = remote.call_args.kwargs['options']
-        self.assertEqual(options.binary_location, '/opt/google/chrome/chrome')
+        self.assertEqual(options.binary_location, '/opt/microsoft/msedge/msedge')
+        self.assertEqual(options.to_capabilities()['browserName'], 'MicrosoftEdge')
         self.assertEqual(options.arguments, ['--headless=new'])
         self.assertEqual(remote.call_args.kwargs['command_executor'], 'http://selenium:4444')
         self.assertEqual(remote.call_args.kwargs['client_config'].timeout, 30)
 
     def test_smoke_quits_isolated_session_on_pass_and_failure(self):
         for unsafe in (False, True):
-            driver = Mock(title='Synthetic Grid check', capabilities={'browserName': 'chrome'})
+            driver = Mock(title='Synthetic Grid check', capabilities={'browserName': 'MicrosoftEdge'})
             driver.execute_cdp_cmd.return_value = {'arguments': ['--no-sandbox'] if unsafe else ['--headless=new']}
             with patch('triage.grid.status', return_value={'ready': True}), patch('triage.grid.create_driver', return_value=driver):
                 if unsafe:
@@ -247,3 +248,39 @@ class GridTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 smoke('http://grid:4444')
         create.assert_not_called()
+
+
+class PublicGridTests(unittest.TestCase):
+    def driver(self):
+        driver = Mock(title='Orion', current_url='https://or9.ca/',
+                      capabilities={'browserName': 'MicrosoftEdge'})
+        driver.execute_cdp_cmd.return_value = {'arguments': ['--headless=new']}
+        driver.find_element.return_value.is_displayed.return_value = True
+        return driver
+
+    def test_or9_is_explicit_read_only_and_quits(self):
+        driver = self.driver()
+        with patch('triage.grid.status', return_value={'ready': True}), patch('triage.grid.create_driver', return_value=driver):
+            result = smoke('http://grid:4444', or9=True)
+        self.assertEqual(result['status'], 'passed')
+        driver.get.assert_called_once_with('https://or9.ca/')
+        driver.find_element.assert_called_once_with('tag name', 'body')
+        driver.find_element.return_value.click.assert_not_called()
+        driver.save_screenshot.assert_not_called()
+        driver.quit.assert_called_once()
+
+    def test_public_failures_never_report_success_and_always_quit(self):
+        for failure in ('redirect', 'empty-title', 'hidden-body', 'navigation', 'wrong-browser', 'unsafe'):
+            with self.subTest(failure=failure):
+                driver = self.driver()
+                if failure == 'redirect': driver.current_url = 'https://other.example/'
+                if failure == 'empty-title': driver.title = ' '
+                if failure == 'hidden-body': driver.find_element.return_value.is_displayed.return_value = False
+                if failure == 'navigation': driver.get.side_effect = RuntimeError('network blocked')
+                if failure == 'wrong-browser': driver.capabilities = {'browserName': 'chrome'}
+                if failure == 'unsafe': driver.execute_cdp_cmd.return_value = {'arguments': ['--no-sandbox']}
+                with patch('triage.grid.status', return_value={'ready': True}), patch('triage.grid.create_driver', return_value=driver):
+                    with self.assertRaises((ValueError, RuntimeError)):
+                        smoke('http://grid:4444', or9=True)
+                driver.quit.assert_called_once()
+                if failure in ('wrong-browser', 'unsafe'): driver.get.assert_not_called()

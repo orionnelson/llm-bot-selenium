@@ -29,7 +29,9 @@ API: `POST /api/python/generate` accepts bounded JSON with `nodeId` and `instruc
 
 ## One Selenium Grid instance
 
-The smallest Grid is the official **standalone Chrome Grid4** image: one server, one isolated browser slot. The pinned current release `4.51.0-20261010` was verified against the official release API; client `selenium==4.51.0` is already in the project lockfile.
+The Grid path now requests Edge, including the existing DAG-owned browser action adapter. See [EDGE_GRID.md](EDGE_GRID.md) for explicit real Grid tests and the read-only or9.ca example.
+
+The smallest Grid is the official **standalone Edge Grid4** image: one server, one isolated browser slot. The pinned current release `4.51.0-20261010` was verified against the official release API; client `selenium==4.51.0` is already in the project lockfile.
 
 An operator with cluster access can apply:
 
@@ -39,7 +41,7 @@ kubectl apply -k deploy/
 
 This declares one non-root Deployment, private ClusterIP Service and synthetic-only NetworkPolicy in `llms`. No service account token, host mounts, personal profiles, privileged mode, public NodePort or browser egress. `/dev/shm` is memory-backed. Readiness probe means the Grid HTTP process is reachable, **not** a passed browser test. Keep these restrictions; do not loosen browser sandbox/security merely to pass acceptance.
 
-The upstream Chrome shell wrapper adds `--no-sandbox`. The node configuration and `triage.grid.create_driver()` explicitly select the **native** `/opt/google/chrome/chrome` binary instead. No sandbox-disabling flags are added. Hosts that cannot support Chrome's sandbox must fail closed. The smoke check inspects actual browser startup arguments before navigation and refuses sandbox-disabled sessions.
+The upstream browser shell wrapper adds `--no-sandbox`. The node configuration and `triage.grid.create_driver()` explicitly select the **native** `/opt/microsoft/msedge/msedge` binary instead. No sandbox-disabling flags are added. Hosts that cannot support Edge's sandbox must fail closed. The smoke check inspects actual browser startup arguments before navigation and refuses sandbox-disabled sessions.
 
 With Grid deployed and the existing project venv installed:
 
@@ -63,11 +65,13 @@ flowchart LR
   Grid --> Page[In-memory test page / quit session]
 ```
 
-## Actual evidence and deployment blockers
+## Historical evidence and deployment blockers
+
+For the current Edge Grid integration and live results, see [EDGE_GRID.md](EDGE_GRID.md). The observations below describe the earlier deployment checkpoint, not current reachability.
 
 A live Smol Friend request returned a contract-valid Qwen3.6 function candidate with `executed: false`; the canonical DAG hash stayed unchanged. Actual HTTP tests also cover disabled mode, canonical-task lookup, provider failures, busy generation and responsive DAG access. Constructor/cleanup tests use mocks and are **not** live Grid evidence.
 
-The new local backend was started for testing on127.0.0.1:3031. **The existing LAN app is unchanged.** Grid DNS did not resolve; Kubernetes API10.96.0.1:443 timed out; Docker, kubectl and Java are unavailable here. The Grid manifest parses as YAML but has not been API-admitted or deployed. The actual Grid probe exited2; no browser/Grid success, screenshots, production execution or restart persistence is claimed. Cluster deployment and a sandbox-capable node remain operator blockers.
+The new local backend was started for testing on127.0.0.1:3031. **The existing LAN app is unchanged.** Grid DNS did not resolve; Kubernetes API10.96.0.1:443 timed out; Docker, kubectl and Java are unavailable here. The Original manifest parsed as YAML; at that earlier checkpoint it had not been deployed. The actual Grid probe exited2; no browser/Grid success, screenshots, production execution or restart persistence is claimed. Cluster deployment and a sandbox-capable node remain operator blockers.
 
 
 The connected browser action/recording adapter is documented in [BROWSER_LOOP.md](BROWSER_LOOP.md). Deploy with Kustomize to include the private synthetic fixture; browser egress remains denied.

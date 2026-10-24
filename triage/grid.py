@@ -1,4 +1,4 @@
-"""Explicit Selenium Grid client + synthetic smoke check. No real-site navigation."""
+"""Edge Selenium Grid client with synthetic and explicit read-only or9.ca checks."""
 import argparse
 import json
 import os
@@ -25,9 +25,9 @@ def status(url):
 def create_driver(url):
     from selenium import webdriver
     from selenium.webdriver.remote.client_config import ClientConfig
-    options = webdriver.ChromeOptions()
+    options = webdriver.EdgeOptions()
     # The official image's shell wrapper adds --no-sandbox. Use the native binary instead.
-    options.binary_location = '/opt/google/chrome/chrome'
+    options.binary_location = '/opt/microsoft/msedge/msedge'
     options.add_argument('--headless=new')
     url = endpoint(url)
     return webdriver.Remote(command_executor=url, options=options,
@@ -40,18 +40,27 @@ def verify_sandbox(driver):
         raise ValueError('Unsafe Grid browser: sandbox disabled')
 
 
-def smoke(url):
+def smoke(url, *, or9=False):
     if not status(url)['ready']:
         raise ValueError('Grid is not ready')
     driver = create_driver(url)
     try:
-        driver.set_page_load_timeout(10)
+        if driver.capabilities.get('browserName', '').lower() != 'microsoftedge':
+            raise ValueError('Expected Microsoft Edge from Grid')
+        driver.set_page_load_timeout(15)
         verify_sandbox(driver)
-        driver.get('data:text/html,<title>Synthetic Grid check</title><h1>grid-ok</h1>')
-        if driver.title != 'Synthetic Grid check':
+        driver.get('https://or9.ca/' if or9 else
+                   'data:text/html,<title>Synthetic Grid check</title><h1>grid-ok</h1>')
+        if or9:
+            # Fixed, owner-approved public example; no clicks, input, capture or model calls.
+            if driver.current_url != 'https://or9.ca/' or not driver.title.strip():
+                raise ValueError('Expected titled or9.ca homepage without redirects')
+            if not driver.find_element('tag name', 'body').is_displayed():
+                raise ValueError('or9.ca body is not visible')
+        elif driver.title != 'Synthetic Grid check':
             raise ValueError('Synthetic page was not loaded')
         return {'status': 'passed', 'browser': driver.capabilities.get('browserName'),
-                'evidence': 'actual synthetic data-URL session', 'sandbox_disabled': False}
+                'evidence': 'actual read-only https://or9.ca/ session' if or9 else 'actual synthetic data-URL session', 'sandbox_disabled': False}
     finally:
         driver.quit()
 
@@ -59,14 +68,16 @@ def smoke(url):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--url', default=os.environ.get('SELENIUM_GRID_URL'))
-    parser.add_argument('--smoke', action='store_true', help='Create one isolated session, load an in-memory page, then quit')
+    checks = parser.add_mutually_exclusive_group()
+    checks.add_argument('--smoke', action='store_true', help='Load an in-memory test page in Edge, then quit')
+    checks.add_argument('--or9', action='store_true', help='Explicit read-only https://or9.ca/ check; requires approved network egress')
     args = parser.parse_args()
     try:
         if not args.url:
             raise ValueError('Configure SELENIUM_GRID_URL or --url first')
-        print(json.dumps(smoke(args.url) if args.smoke else status(args.url)))
+        print(json.dumps(smoke(args.url, or9=args.or9) if args.smoke or args.or9 else status(args.url)))
     except Exception as error:
-        parser.exit(2, f'Grid blocked: {type(error).__name__}; no success claimed\n')
+        parser.exit(2, f'Grid blocked: {type(error).__name__}; no success claimed. Check Grid/container logs and browser/network readiness.\n')
 
 
 if __name__ == '__main__':
