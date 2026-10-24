@@ -60,8 +60,8 @@ class ChartView:
             Observation(binding.action, binding.context, self.evidence_id, {},
                         self.captured_at, self.ui_version, self.session_valid),
             binding.action, 'chart-v1')
-        if type(self.sample_at) is not int or not 0 <= now - self.sample_at <= 300:
-            raise GuardError('stale, future or missing chart sample')
+        if type(self.sample_at) is not int or not 0 <= now - self.sample_at <= 300 or self.sample_at > self.captured_at:
+            raise GuardError('stale, future, post-capture or missing chart sample')
         if not binding.context.start <= self.sample_at <= binding.context.end:
             raise GuardError('sample outside bound chart time window')
         if self.state != 'ready':
