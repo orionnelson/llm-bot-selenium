@@ -1,4 +1,5 @@
 import json
+from dataclasses import replace
 from pathlib import Path
 from threading import Event, Thread
 from http.client import HTTPConnection
@@ -10,7 +11,7 @@ from urllib.error import URLError
 from triage.dag import DAG, Task
 from triage.test_codegen import MODEL, generate
 from triage.grid import create_driver, endpoint, status, smoke
-from test_dag_server import backend, request
+from test_dag_server import backend, request, commit
 
 SOURCE = 'def run(inputs, context=None):\n    return {"branch": "yes" if inputs["i"] > 3 else "no"}\n'
 
@@ -136,6 +137,52 @@ class GenerationTests(unittest.TestCase):
                 self.assertEqual(request(port, 'POST', body, {'Content-Type': 'application/json'}, '/api/python/generate')[0], 400)
             self.assertEqual(path.read_bytes(), before)
 
+
+    def test_canonical_change_during_generation_discards_candidate_and_releases_lock(self):
+        for change in ('commit', 'external', 'invalid', 'missing', 'unchanged'):
+            with self.subTest(change=change), backend(saved(), test_mode=True) as (port, path, _):
+                entered, release, responses = Event(), Event(), []
+                candidate = {'source': SOURCE, 'model': MODEL, 'review': 'pending', 'executed': False}
+                def slow(*args):
+                    entered.set()
+                    if not release.wait(5):
+                        raise TimeoutError('Test did not release model double')
+                    return candidate
+                body = json.dumps({'nodeId': 'saved', 'instructions': 'Synthetic comparison'})
+                def generate_request():
+                    return request(port, 'POST', body, {'Content-Type': 'application/json'}, '/api/python/generate')
+                with patch('triage.test_codegen.generate', side_effect=slow):
+                    worker = Thread(target=lambda: responses.append(generate_request()))
+                    worker.start()
+                    try:
+                        self.assertTrue(entered.wait(2))
+                        original = request(port)[1]
+                        changed = replace(saved(), tasks=(replace(saved().tasks[0],
+                            predicate={**saved().tasks[0].predicate, 'threshold': 9}), *saved().tasks[1:]))
+                        if change == 'commit':
+                            self.assertEqual(commit(port, original['revision'], changed.to_spec())[0], 200)
+                        elif change == 'external':
+                            path.write_text(changed.to_python())
+                        elif change == 'invalid':
+                            path.write_text('not a DAG')
+                        elif change == 'missing':
+                            path.unlink()
+                        current = path.read_bytes() if path.exists() else None
+                    finally:
+                        release.set()
+                        worker.join(5)
+                    self.assertFalse(worker.is_alive())
+                    self.assertEqual(len(responses), 1)
+                    status, value = responses[0]
+                    self.assertEqual(status, 200 if change == 'unchanged' else 409 if change in ('commit', 'external') else 502)
+                    if change == 'unchanged':
+                        self.assertEqual(value, candidate)
+                    else:
+                        self.assertNotIn('source', value)
+                    self.assertEqual(path.read_bytes() if path.exists() else None, current)
+                    # A rejected response must not leave the single-generation lock held.
+                    path.write_text(saved().to_python())
+                    self.assertEqual(generate_request()[0], 200)
 
     def test_slow_generation_does_not_block_dag_reads_and_second_generation_is_busy(self):
         entered, release = Event(), Event()
