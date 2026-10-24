@@ -89,6 +89,41 @@ class ChartJourneyTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertEqual(self.check.evaluate(view, 500)['state'], 'unknown')
 
+    def test_sample_after_capture_is_unknown_in_both_journeys(self):
+        # Both timestamps are fresh at evaluation time, but the capture cannot
+        # attest to a sample that did not exist when it was taken.
+        for value in (0, 7):
+            with self.subTest(value=value):
+                inconsistent = replace(self.view, evidence_id='later-sample', sample_at=101, value=value)
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                observer.record('navigate', 'dashboard', inconsistent)
+                issue = observer.stop()  # Preserve bad evidence, never validate it.
+                with self.assertRaises(GuardError):
+                    ChartCheck.from_issue(issue, 1, sre_validated=True, now=101)
+                bot = FakeBrowser(inconsistent)
+                result = investigate_chart(self.issue, self.check, bot, now=101)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertEqual(result['conclusion']['evidence'], 'later-sample')
+                monitor = self.monitor()
+                result = monitor.tick(101, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertTrue(result['report'])
+                self.assertEqual(result['evidence'], 'later-sample')
+                self.assertEqual(monitor.seen_evidence, {'observed-1', 'later-sample'})
+
+    def test_sample_at_or_before_capture_keeps_condition_and_freshness_checks(self):
+        for captured, sample, value, expected in ((101, 100, 0, 'healthy'),
+                                                   (101, 101, 7, 'failure'),
+                                                   (401, 100, 0, 'unknown')):
+            with self.subTest(captured=captured, sample=sample):
+                view = replace(self.view, evidence_id='fresh', captured_at=captured,
+                               sample_at=sample, value=value)
+                self.assertEqual(self.check.evaluate(view, captured)['state'], expected)
+                if captured == 101:
+                    result = investigate_chart(self.issue, self.check, FakeBrowser(view), now=101)
+                    self.assertEqual(result['conclusion']['state'], expected)
+                self.assertEqual(self.monitor().tick(captured, FakeBrowser(view))['state'], expected)
+
     def test_validation_requires_rule_and_valid_current_observation(self):
         with self.assertRaises(GuardError):
             ChartCheck.from_issue(self.issue, 1, now=100)
