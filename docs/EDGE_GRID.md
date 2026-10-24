@@ -1,5 +1,9 @@
 # Microsoft Edge Selenium Grid
 
+## Connected UI
+
+The UI integration now uses the same backend controller for saved tests. See [UI_GRID.md](UI_GRID.md), including real API→Grid startup failure evidence and the distinct static-host deployment gate.
+
 ## Scope
 
 `triage.grid.create_driver()` now requests `MicrosoftEdge` using real `EdgeOptions` and `/opt/microsoft/msedge/msedge`. The existing DAG-owned browser-action runner imports this same factory, so its remote sessions use Edge too. No local browser, driver executable, automatic installer or personal profile is needed for this remote path.

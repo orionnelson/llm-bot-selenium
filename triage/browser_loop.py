@@ -16,7 +16,7 @@ import time
 from urllib.parse import unquote, urlsplit, urlunsplit
 from uuid import uuid4
 
-from .grid import create_driver, verify_sandbox, status as grid_status
+from .grid import create_driver, verify_sandbox, status as grid_status, verify_or9
 from .test_codegen import complete, MODEL
 
 ID = re.compile(r'^[a-z][a-z0-9_-]{0,63}$')
@@ -62,11 +62,13 @@ def safe_url(value):
 
 def task_config(task, urls):
     c = task.params.get('browser')
-    if not isinstance(c, dict) or set(c) != {'allowed_actions', 'expected', 'max_steps'}:
-        raise BrowserBlocked('Saved task requires browser policy')
     url, goal = safe_url(task.params.get('target')), task.params.get('prompt')
     if url not in urls or not isinstance(goal, str) or not 1 <= len(goal) <= 4000:
         raise BrowserBlocked('Saved task URL/goal is not approved')
+    if c == {'mode': 'read-only-or9'} and url == 'https://or9.ca/':
+        return url, goal, c
+    if not isinstance(c, dict) or set(c) != {'allowed_actions', 'expected', 'max_steps'}:
+        raise BrowserBlocked('Saved task requires browser policy')
     ids, expected, steps = c['allowed_actions'], c['expected'], c['max_steps']
     if not isinstance(ids, list) or not 1 <= len(ids) <= 20 or any(not isinstance(i, str) or not ID.fullmatch(i) for i in ids) or len(set(ids)) != len(ids):
         raise BrowserBlocked('Expected bounded explicit control allowlist')
@@ -204,6 +206,8 @@ class BrowserRuns:
             raise OSError('Grid is not configured')
         if not grid_status(os.environ['SELENIUM_GRID_URL'])['ready']:
             raise OSError('Grid is not ready')
+        if config[2].get('mode') == 'read-only-or9' and video:
+            raise BrowserBlocked('Public homepage check does not capture frames or video')
         if video and not shutil.which('ffmpeg'):
             raise OSError('Action-frame video requires installed ffmpeg')
         with self.lock:
@@ -254,6 +258,12 @@ class BrowserRuns:
             driver.set_script_timeout(10)
             driver.set_window_size(1280, 900)
             guard(); driver.get(config[0]); guard()
+            if config[2].get('mode') == 'read-only-or9':
+                verify_or9(driver); guard()
+                triage('navigate', config[0])
+                value['status'] = 'passed'
+                value['verifiedResult'] = 'Approved or9.ca homepage has a title and visible body'
+                return
             observation = observe(driver, config[2], self.urls)
             frame(); triage('navigate', observation['url']); save(folder, value)
             for _ in range(config[2]['max_steps']):
@@ -295,6 +305,8 @@ class BrowserRuns:
             value['status'] = 'cancelled' if event.is_set() else 'blocked' if isinstance(error, (ValueError, TimeoutError)) else 'recording_failed' if isinstance(error, OSError) else 'failed'
             value['error'] = type(error).__name__  # Never log untrusted transport/DOM exception messages.
             if type(error) is BrowserBlocked: value['reason'] = str(error)
+            elif type(error).__name__ == 'SessionNotCreatedException':
+                value['reason'] = 'Edge could not start on the Grid node. Inspect Selenium container logs; no navigation occurred.'
         finally:
             if driver is not None:
                 try: driver.quit()

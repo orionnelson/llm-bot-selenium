@@ -20,6 +20,8 @@ flowchart LR
 
 ## Setup
 
+For the current shared UI connection, public read-only policy, debugger/history wiring and actual dispatch evidence, see [UI_GRID.md](UI_GRID.md). The annotated action/capture path described below remains unchanged.
+
 1. An operator deploys the private Grid **and fixture** together: `kubectl apply -k deploy/`. The Kustomize ConfigMap supplies the two static fixture pages; the additional non-root Python HTTP sidecar binds only127.0.0.1:8080 inside the Grid pod. Browser egress stays denied. The URL resolves in the **browser's pod**, not the backend. No public fixture port, SSO, host profile or network-policy bypass.
 2. Build `ui/` using the existing Node22 workflow; install the existing Python lockfile into a local venv for Selenium. Optional frame-video export needs an existing `ffmpeg` with `libvpx-vp9`; it is not downloaded automatically.
 3. Initialize a canonical example only if needed, preserving any existing DAG:

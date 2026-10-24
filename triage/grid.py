@@ -19,7 +19,10 @@ def status(url):
     if len(content) > 100000:
         raise ValueError('Oversized Grid status')
     value = json.loads(content)['value']
-    return {'ready': value.get('ready') is True, 'nodes': len(value.get('nodes', []))}
+    browsers = sorted({s.get('stereotype', {}).get('browserName', '')
+                       for n in value.get('nodes', []) for s in n.get('slots', [])} - {''})
+    return {'ready': value.get('ready') is True, 'nodes': len(value.get('nodes', [])),
+            'browsers': browsers, 'edgeAvailable': 'MicrosoftEdge' in browsers}
 
 
 def create_driver(url):
@@ -40,6 +43,13 @@ def verify_sandbox(driver):
         raise ValueError('Unsafe Grid browser: sandbox disabled')
 
 
+def verify_or9(driver):
+    if driver.current_url != 'https://or9.ca/' or not driver.title.strip():
+        raise ValueError('Expected titled or9.ca homepage without redirects')
+    if not driver.find_element('tag name', 'body').is_displayed():
+        raise ValueError('or9.ca body is not visible')
+
+
 def smoke(url, *, or9=False):
     if not status(url)['ready']:
         raise ValueError('Grid is not ready')
@@ -53,10 +63,7 @@ def smoke(url, *, or9=False):
                    'data:text/html,<title>Synthetic Grid check</title><h1>grid-ok</h1>')
         if or9:
             # Fixed, owner-approved public example; no clicks, input, capture or model calls.
-            if driver.current_url != 'https://or9.ca/' or not driver.title.strip():
-                raise ValueError('Expected titled or9.ca homepage without redirects')
-            if not driver.find_element('tag name', 'body').is_displayed():
-                raise ValueError('or9.ca body is not visible')
+            verify_or9(driver)
         elif driver.title != 'Synthetic Grid check':
             raise ValueError('Synthetic page was not loaded')
         return {'status': 'passed', 'browser': driver.capabilities.get('browserName'),

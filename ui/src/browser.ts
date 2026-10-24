@@ -1,6 +1,6 @@
 import { parseSession, type TriageSession } from './snippets';
-export interface BrowserStep { id:string;action:'click';candidate:string;label:string;locator:string;url:string;evidence:string;state:string;before:string;after?:string;videoMs:number }
-export interface BrowserRun { version:'browser-run/v1';id:string;taskId:string;status:string;evidenceKind:string;startedAt:string;url:string;model:string;modelCalls:number;frames:string[];steps:BrowserStep[];triage:TriageSession;video?:{url:string;kind:'action-frames';frameMs:number};verifiedResult?:string;error?:string;reason?:string }
+export interface BrowserStep { proposal?:unknown; id:string;action:'click';candidate:string;label:string;locator:string;url:string;evidence:string;state:string;before:string;after?:string;videoMs:number }
+export interface BrowserRun { policy?:{mode?:string}; version:'browser-run/v1';id:string;taskId:string;status:string;evidenceKind:string;startedAt:string;url:string;model:string;modelCalls:number;frames:string[];steps:BrowserStep[];triage:TriageSession;video?:{url:string;kind:'action-frames';frameMs:number};verifiedResult?:string;error?:string;reason?:string }
 export const activeRun=(r:BrowserRun)=>['queued','running','cancelling'].includes(r.status);
 const validId=(id:string)=>{if(!/^[0-9a-f]{32}$/.test(id))throw Error('Invalid recording ID');return id;};
 export function recordingAsset(url:string){if(!/^\/api\/browser\/runs\/[0-9a-f]{32}\/(frame-\d{2}\.png|actions\.webm)$/.test(url))throw Error('Invalid private recording asset');return url;}

@@ -109,3 +109,7 @@ Opt-in backend generation uses Smol Friend **Qwen3.6-35B-A3B Q4**, returning rev
 ### Edge Selenium Grid
 
 The remote test/browser-action path uses Microsoft Edge. See [Edge Grid integration](docs/EDGE_GRID.md) for the deployment, opt-in integration tests, and explicit read-only `https://or9.ca/` example. No local Edge/driver installation is needed for this path.
+
+### Connected Edge UI
+
+Use the same-origin Python UI/API server, not the old static NodePort host. See [UI → Edge Grid walkthrough and exact acceptance gates](docs/UI_GRID.md). The current UI supports saved task policy editing, actual Grid dispatch/cancel/history and recorded evidence; live Edge startup remains blocked and no full-product acceptance is claimed.
