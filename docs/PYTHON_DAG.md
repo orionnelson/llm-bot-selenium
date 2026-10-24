@@ -1,5 +1,42 @@
 # Python-first functional DAG definitions
 
+## DAG → UI backend (authoritative direction)
+
+The Python definition comes **first**. `triage.dag_server` loads it through the existing safe AST decoder, validates it with dataclasses/graphlib, and returns its canonical spec and static plan. The canvas is an editable projection of that result, not the owner of the backend model. UI edits remain proposals until backend validation and atomic Python-file persistence succeed.
+
+```mermaid
+flowchart LR
+  Python[Authoritative Python DAG file] --> Backend[Safe loader + DAG validation / static plan]
+  Backend --> Spec[Canonical DAG response + revision]
+  Spec --> UI[Canvas projection / editable draft]
+  UI --> Proposal[Proposed functional changes + expected revision]
+  Proposal --> Backend
+  Backend -->|validated atomic commit| Python
+  Layout[Local layout JSON] --> UI
+```
+
+Run the local backend and built UI together (Python3.11+, no new Python dependency):
+
+```sh
+cd ui && npm ci --include=dev && npm run build && cd ..
+# Initialize once; do not overwrite an existing canonical definition.
+mkdir -p runtime
+cp -n examples/editor_dag.py runtime/workflow_dag.py
+python -m triage.dag_server --dag runtime/workflow_dag.py
+# Open http://127.0.0.1:3001/
+```
+
+- `GET /api/dag` reads the **server-owned** definition, returning `definition`, `python`, `plan`, and a content-hash `revision`. Browser state never seeds or replaces a missing/invalid server DAG.
+- `PUT /api/dag` accepts only bounded `sre-dag/v1` JSON with `Content-Type: application/json` and `If-Match: <revision>`. Validation and safe Python roundtrip precede atomic replacement. Stale writes return409; malformed proposals leave the previous file intact. One local backend process owns the file.
+- On startup the UI loads the canonical DAG; if the user edits before loading finishes, those edits are retained and **Load DAG** explicitly replaces the draft. Saved positions are local, keyed by task ID. Unused snippet-library assets remain local drafts.
+- **Save** stores the local draft/layout, then commits a functional proposal only after a backend DAG was loaded. Successful saves project the returned canonical definition. Failed/conflicting saves keep the local draft. Edits made during a save remain unsaved, not overwritten by the response.
+- **Load saved** restores a local draft, not an authoritative definition. **Load DAG** reads the backend. Existing Python/JSON exports and the Task DAG inspector are draft previews, not backend commits. The last backend-returned Python artifact is cached locally only after a successful save.
+- Standalone Vite/the existing Bun static host remain **offline draft/demo modes**; a200 for index.html no longer masquerades as a connected DAG backend. The optional Bun LLM adapter is not ported into this backend.
+
+**Boundaries:** this is a loopback-only local editing backend, not an authenticated LAN/public service. Host/origin checks reject cross-origin and DNS-rebinding requests; no permissive CORS. Use a local SSH tunnel if remote access is needed; do not expose this server publicly. Static files are confined to the built assets directory. No arbitrary file-path API, handler execution, real-browser task execution, scheduler, model calls, or production deployment is added. A static topological plan is not parallel runtime execution. Backend actions must be registered in the editor to be displayed; unsupported actions cannot silently replace the draft. The existing LAN demo is not changed by installing this code.
+
+**Executed checks:** real HTTP tests cover Python-authored load/commit, stale updates, malformed payloads, atomic-write failures, origin/Host rejection, static-path/symlink containment, branch/join and scoped loops with inert source. A frontend integration test starts the actual Python HTTP server and exercises canonical DAG → canvas → validated commit → persisted Python; no browser screenshot/interaction acceptance is claimed.
+
 ## Existing Python foundation
 
 The implementation uses **Python's existing `dataclasses` and `graphlib.TopologicalSorter`**, not a hand-written topological-sort algorithm or a new scheduler dependency. The repository already uses dataclasses for its core contracts.
@@ -60,7 +97,7 @@ Validation rejects duplicate/missing IDs, dependency cycles, scope cycles, cross
 - **`workflow_dag.py`**: canonical Python functional definition; no positions, zoom, colors or panel sizes.
 - **`workflow.layout.json`**: `sre-layout/v1` visual node positions, keyed by stable task ID. Pane dimensions remain per-user local UI state.
 - **DAG JSON / bundle**: typed `sre-dag/v1` transport representation of the same Python model; bundles pair it with separate layout. This is not a separate execution language.
-- **Legacy template JSON**: retained for editable drafts, compatibility and unused template/snippet library assets. It is not executed. Save also writes a separate functional Python artifact and layout artifact when wiring is complete; incomplete drafts are preserved without overwriting the previous valid Python definition.
+- **Legacy template JSON**: retained for editable drafts, compatibility and unused template/snippet library assets. It is not executed. Save retains separate layout/draft artifacts; when connected, only a backend-accepted canonical definition updates the functional Python artifact. Incomplete drafts never overwrite the previous valid definition.
 
 Import accepts typed DAG specs, DAG/layout bundles, separate layout JSON and old visual templates. A layout import only changes positions. Per-node snippet snapshots remain functional task parameters; unused palette/library templates stay in template JSON.
 
@@ -82,7 +119,7 @@ python -m triage.dag workflow_dag.py --format plan
 python -m triage.dag workflow.dag.json --output workflow_dag.py
 ```
 
-The safe `.py` loader uses Python **AST** with an allowlist: literal values and keyword-only `DAG`, `Task`, `LoopSpec`, `PythonSource` constructors; the known import declaration; `dag = ...`; and `dag.validate()`. Submitted imports, arbitrary calls, comprehensions, attribute access, expansions and executable statements are rejected. It never uses `eval`, `exec` or imports submitted code. Handler strings are preserved, not run. This restricted declarative format intentionally does not accept arbitrary Airflow-style Python builder scripts.
+The safe `.py` loader uses Python **AST** with an allowlist: literal values and keyword-only `DAG`, `Task`, `LoopSpec`, `PythonSource` constructors; the known import declaration; `dag = ...`; and `dag.validate()`. Submitted imports, arbitrary calls, comprehensions, attribute access, expansions and executable statements are rejected. It never uses `eval`, `exec` or imports submitted code. Duplicate constructor keywords are rejected before construction, rather than silently taking the last value; see [regression evidence](DAG_KEYWORD_QA.md). Handler strings are preserved, not run. This restricted declarative format intentionally does not accept arbitrary Airflow-style Python builder scripts.
 
 The earlier `triage.studio_python` exporter remains as a compatibility helper for review-only handler files; `triage.dag` and the UI's primary Py/DAG exports are the functional DAG interface.
 

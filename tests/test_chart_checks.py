@@ -1,6 +1,7 @@
 """Synthetic acceptance slice: no real browser/model/recording/monitor schedule."""
 from dataclasses import replace
 import unittest
+from threading import Event, Thread
 
 from triage.core import Action, Context, GuardError
 from triage.chart_checks import (ChartBinding, ChartView, SyntheticObserver, ChartCheck,
@@ -88,6 +89,41 @@ class ChartJourneyTests(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertEqual(self.check.evaluate(view, 500)['state'], 'unknown')
 
+    def test_sample_after_capture_is_unknown_in_both_journeys(self):
+        # Both timestamps are fresh at evaluation time, but the capture cannot
+        # attest to a sample that did not exist when it was taken.
+        for value in (0, 7):
+            with self.subTest(value=value):
+                inconsistent = replace(self.view, evidence_id='later-sample', sample_at=101, value=value)
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                observer.record('navigate', 'dashboard', inconsistent)
+                issue = observer.stop()  # Preserve bad evidence, never validate it.
+                with self.assertRaises(GuardError):
+                    ChartCheck.from_issue(issue, 1, sre_validated=True, now=101)
+                bot = FakeBrowser(inconsistent)
+                result = investigate_chart(self.issue, self.check, bot, now=101)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertEqual(result['conclusion']['evidence'], 'later-sample')
+                monitor = self.monitor()
+                result = monitor.tick(101, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertTrue(result['report'])
+                self.assertEqual(result['evidence'], 'later-sample')
+                self.assertEqual(monitor.seen_evidence, {'observed-1', 'later-sample'})
+
+    def test_sample_at_or_before_capture_keeps_condition_and_freshness_checks(self):
+        for captured, sample, value, expected in ((101, 100, 0, 'healthy'),
+                                                   (101, 101, 7, 'failure'),
+                                                   (401, 100, 0, 'unknown')):
+            with self.subTest(captured=captured, sample=sample):
+                view = replace(self.view, evidence_id='fresh', captured_at=captured,
+                               sample_at=sample, value=value)
+                self.assertEqual(self.check.evaluate(view, captured)['state'], expected)
+                if captured == 101:
+                    result = investigate_chart(self.issue, self.check, FakeBrowser(view), now=101)
+                    self.assertEqual(result['conclusion']['state'], expected)
+                self.assertEqual(self.monitor().tick(captured, FakeBrowser(view))['state'], expected)
+
     def test_validation_requires_rule_and_valid_current_observation(self):
         with self.assertRaises(GuardError):
             ChartCheck.from_issue(self.issue, 1, now=100)
@@ -163,6 +199,58 @@ class ChartJourneyTests(unittest.TestCase):
             monitor.tick(100, bot)
         with self.assertRaises(GuardError):
             monitor.tick(99, bot)
+
+    def test_stop_during_read_discards_inflight_result_or_error(self):
+        for outcome in ('healthy', 'failure', 'expired', 'transport-error'):
+            with self.subTest(outcome=outcome):
+                monitor = self.monitor()
+                view = replace(self.view, evidence_id='inflight', value=5 if outcome == 'failure' else 0,
+                               session_valid=outcome != 'expired')
+                bot = FakeBrowser(view)
+
+                def read_chart(route, binding):
+                    bot.reads.append((route, binding))
+                    monitor.stop()  # Deterministic stop while an adapter read is in flight.
+                    if outcome == 'transport-error':
+                        raise RuntimeError('private transport detail')
+                    return view
+
+                bot.read_chart = read_chart
+                self.assertIsNone(monitor.tick(100, bot))
+                self.assertIsNone(monitor.last_state)
+                self.assertEqual(monitor.seen_evidence, {self.check.source_evidence})
+                self.assertIsNone(monitor.tick(400, bot))
+                self.assertEqual(len(bot.reads), 1)
+
+    def test_stop_from_caller_while_adapter_read_is_blocked(self):
+        for fails in (False, True):
+            with self.subTest(fails=fails):
+                monitor = self.monitor()
+                entered, release = Event(), Event()
+                results = []
+                bot = FakeBrowser(self.view)
+
+                def read_chart(route, binding):
+                    entered.set()
+                    if not release.wait(5):
+                        raise TimeoutError('test did not release adapter')
+                    if fails:
+                        raise OSError('private transport detail')
+                    return replace(self.view, evidence_id='late', value=5)
+
+                bot.read_chart = read_chart
+                worker = Thread(target=lambda: results.append(monitor.tick(100, bot)))
+                worker.start()
+                try:
+                    self.assertTrue(entered.wait(5))
+                    monitor.stop()
+                finally:
+                    release.set()
+                    worker.join(5)
+                self.assertFalse(worker.is_alive())
+                self.assertEqual(results, [None])
+                self.assertIsNone(monitor.last_state)
+                self.assertEqual(monitor.seen_evidence, {self.check.source_evidence})
 
     def test_missed_ticks_do_not_burst_and_repeated_evidence_is_unknown(self):
         monitor = self.monitor()

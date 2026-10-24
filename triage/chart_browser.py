@@ -6,8 +6,9 @@ keys, cookies, storage or arbitrary text. Caller owns separate isolated drivers.
 from dataclasses import asdict
 import json
 from urllib.parse import urlencode, urlsplit
+from uuid import uuid4
 
-from .chart_checks import ChartBinding, ChartView, identifier
+from .chart_checks import ChartBinding, ChartView, SyntheticObserver, identifier
 from .core import Action, Context, GuardError
 from .selenium_port import SeleniumPort
 
@@ -68,3 +69,27 @@ class SeleniumChartPort(SeleniumPort):
                 or route not in ('dashboard', 'entity-chart')):
             raise GuardError('observation consent/session/action/scope refused')
         observer.record(action, route, self.read_visible(binding, route))
+
+    def export_studio_session(self, issue, *, consent=False):
+        """Explicit in-memory metadata export; no DOM read, file write or recording.
+
+        Full chart evidence stays in the issue, not in the reusable click path.
+        Studio imports this as unverified metadata, never as successful execution.
+        """
+        if (consent is not True or issue.observer_session != self.session
+                or not 1 <= len(issue.events) <= 100):
+            raise GuardError('export consent, matching observer and bounded issue required')
+        # Reuse recorder validation: dataclasses alone do not establish trust.
+        checked = SyntheticObserver(self.session, [e.view.binding for e in issue.events], consent=True)
+        start = issue.events[0].view.captured_at
+        events = []
+        for index, event in enumerate(issue.events):
+            checked.record(event.action, event.route, event.view)
+            elapsed = (event.view.captured_at - start) * 1000
+            if not 0 <= elapsed <= 86400000:
+                raise GuardError('Studio export duration exceeds 24 hours')
+            events.append({'id': 'event-' + str(index), 'elapsedMs': elapsed,
+                           'action': event.action, 'url': self.base_url + '/chart/' + event.route})
+        # Never serialize WebDriver's session ID, binding queries or evidence values.
+        return {'version': 'triage-session/v1', 'id': 'observed-' + uuid4().hex,
+                'mode': 'recorded', 'provenance': 'imported', 'url': events[0]['url'], 'events': events}

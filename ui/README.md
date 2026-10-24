@@ -13,11 +13,19 @@ npm run preview                 # http://127.0.0.1:4173
 
 Requires Node22+ and Python3 for the cross-language artifact test. The installed demo is at `http://smol-kitten.local:32085/` on the owner's LAN, not a public GitHub deployment.
 
+## DAG-first backend
+
+For connected editing, build this UI and run `python -m triage.dag_server --dag runtime/workflow_dag.py` from the repository root with an existing safe Python definition. [Initialization, API, architecture and limits](../docs/PYTHON_DAG.md#dag--ui-backend-authoritative-direction). The backend owns functionality; the canvas is its editable projection. Save submits a revision-checked proposal, and Load DAG reloads the authoritative model. Standalone Vite/preview/static hosts remain offline drafts; no live execution is implied.
+
+## Connected Grid actions and replay
+
+Default **Run & Record** loads the selected task policy from the canonical backend, not unsaved canvas config. Approve the displayed saved URL/control/capture boundary, then start a bounded asynchronous test run, cancel, inspect selected-action frames, export native triage metadata, or play an optional action-frame WebM (not continuous video). Backend status/real Grid readiness remain separate from old DEMO fixture playback. [Policy, setup, API and actual deployment limits](../docs/BROWSER_LOOP.md).
+
 ## Individual components
 
 | Component | Purpose and behavior |
 |---|---|
-| Top navigation | Editable project name; local Save; Run demo; **Record**; Schedule/Share explain their backend boundaries. |
+| Top navigation | Editable draft name; backend-validated Save (local-only when offline); Run demo; **Record**; Schedule/Share explain their backend boundaries. |
 | Component library | Search actions/integrations; drag or click to create nodes. Templates restores the base graph. |
 | Workflow canvas | React Flow pan/zoom/minimap, snapping, drag/connect and click-connect, conditional Yes/No ports, delete and duplicate; ELK auto-layout loads on demand. |
 | Node inspector | Target/region/metrics configuration, explicit Connect to control, prompt, outputs, error policies and **Python** implementation. |
@@ -48,6 +56,10 @@ python -m unittest discover -s tests -p test_studio_python.py -v
 ```
 
 Syntax validation is not a security sandbox. Do not import or run unreviewed Python. Python export is an artifact, not a deployed DAG or workflow runner.
+
+## Import consented loopback observer metadata
+
+`SeleniumChartPort.export_studio_session(issue, consent=True)` exports an existing stopped issue's navigation and semantic `shortcut-open-chart` events to **Triage → Import triage session JSON**. Clip and reuse the path in a snippet node; JSON/Python DAG artifacts retain it, and execution remains **Pending**. The export omits WebDriver IDs, chart binding queries and evidence values. This is imported/unverified metadata, not video or a live recorder. [Full usage, privacy boundaries and actual cross-language tests](../docs/OBSERVER_STUDIO_QA.md).
 
 ## Recording boundaries
 
@@ -88,7 +100,7 @@ The script uses an isolated temporary profile and the existing Selenium runtime 
 - `src/python.ts`: config→Python starters, constrained branch comparisons, generation-request contract and source export.
 - `src/PythonInspector.tsx`: branch fields, editable source, provenance/review and LLM request UI.
 - `src/recording.ts`: bounded consented authoring capture and pause/resume/stop transitions.
-- `src/workflow.ts`, `shared/`: earlier URL-seed IR and validation; SRE graph uses its own version1 schema. `SeedStudio.tsx` preserves the earlier experimental editor source, not an additional route.
+- `src/workflow.ts`, `shared/`: URL-seed interchange/privacy guards. `scripts/seed-page.mjs` uses this actual validator (Node22.18+); `src/page-seed.ts` converts canonical offline seeds through the active editor import into native version1 workflow/snippet metadata. `SeedStudio.tsx` remains archived source, not an additional route. See [CLI usage and evidence](../docs/PAGE_SEED_QA.md).
 - `triage/studio_python.py`: Python-side branch/config handling, AST syntax checks and review-only export.
 
 ```mermaid
@@ -163,3 +175,8 @@ Open **Task DAG** for each selected item, or **DAG** in the canvas toolbar for t
 Hand-edit the Python definition, convert it with `python -m triage.dag workflow_dag.py --format spec --output workflow.dag.json`, then import that spec and optional layout. The loader accepts only literal constructors and never executes submitted code. Full [typed-model and CLI guide](../docs/PYTHON_DAG.md), including limitations and existing-framework rationale.
 
 The top-right header now reserves independent columns for tabs, DEMO/REPLAY and maximize; tabs scroll inside their own area. React Flow explicitly fills all four canvas edges and the center track can shrink without leaving a stale right-side gap.95frontendtests and95Pythonpassed/2browser-skipped; visual browser acceptance remains blocked, not claimed.
+
+
+## Test-mode generator and Selenium Grid
+
+Opt-in backend generation uses Smol Friend **Qwen3.6-35B-A3B Q4**, returning review-only candidates for saved DAG tasks. A private single-instance Selenium Grid manifest and synthetic smoke CLI are included. [Run instructions, actual evidence and deployment blockers](../docs/TEST_RUNTIME.md). Existing LAN/static hosting is not silently upgraded; no generated code or real-site workflow is executed.

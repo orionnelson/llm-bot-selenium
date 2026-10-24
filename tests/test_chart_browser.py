@@ -56,6 +56,10 @@ class ChartDOMTests(unittest.TestCase):
         self.assertEqual(self.sre.driver.current_url, original_url)
         self.assertEqual(self.routes, ['dashboard', 'entity-chart'])
         self.assertNotIn('Ignore', str(issue))
+        session = self.sre.export_studio_session(issue, consent=True)
+        self.assertEqual([e['action'] for e in session['events']], ['navigate', 'shortcut-open-chart'])
+        self.assertNotIn('binding', str(session))
+        self.assertEqual(self.sre.driver.current_url, original_url)
         monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
         self.assertTrue(monitor.tick(100, self.bot)['report'])
         self.now = 400
@@ -65,6 +69,22 @@ class ChartDOMTests(unittest.TestCase):
         reads = len(self.routes)
         self.assertIsNone(monitor.tick(1000, self.bot))
         self.assertEqual(len(self.routes), reads)
+
+    def test_http_dom_sample_newer_than_capture_is_not_trusted(self):
+        issue, check = self.issue()
+        self.changes = {'captured_at': 99}  # Sample=100 and now=100: fresh but inconsistent.
+        result = investigate_chart(issue, check, self.bot, now=self.now)
+        self.assertEqual(result['conclusion']['state'], 'unknown')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        result = monitor.tick(100, self.bot)
+        self.assertEqual(result['state'], 'unknown')
+        self.assertTrue(result['report'])
+        with self.assertRaises(GuardError):
+            self.issue()
+        self.changes, self.now = {}, 400
+        result = monitor.tick(400, self.bot)
+        self.assertEqual(result['state'], 'healthy')
+        self.assertFalse(result['report'])
 
     def test_dom_loading_missing_stale_drift_session_and_changed_filters(self):
         issue, check = self.issue()

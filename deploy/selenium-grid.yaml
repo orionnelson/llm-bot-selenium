@@ -1,0 +1,91 @@
+# Test-only, single-instance Grid. No public service, personal profiles or production access.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: selenium-grid
+  namespace: llms
+spec:
+  replicas: 1
+  selector:
+    matchLabels: {app: selenium-grid}
+  template:
+    metadata:
+      labels: {app: selenium-grid}
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: selenium
+          image: selenium/standalone-edge:4.51.0-20261010
+          ports:
+            - {containerPort: 4444}
+          env:
+            - {name: SE_NODE_MAX_SESSIONS, value: '1'}
+            - {name: SE_NODE_SESSION_TIMEOUT, value: '300'}
+            # Bypass the image's --no-sandbox shell wrapper, not the browser sandbox.
+            - {name: SE_BROWSER_BINARY_LOCATION, value: /opt/microsoft/msedge/msedge}
+            - {name: SE_ENABLE_TRACING, value: 'false'}
+          securityContext:
+            allowPrivilegeEscalation: false
+          resources:
+            requests: {cpu: 500m, memory: 1Gi}
+            limits: {cpu: '2', memory: 4Gi}
+          readinessProbe:
+            httpGet: {path: /status, port: 4444}
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - {name: shm, mountPath: /dev/shm}
+        - name: fixture
+          image: python:3.11-slim-bookworm
+          command: [python, -m, http.server, '8080', --bind, 127.0.0.1, --directory, /fixture]
+          env:
+            - {name: PYTHONDONTWRITEBYTECODE, value: '1'}
+          securityContext:
+            runAsUser: 65534
+            runAsGroup: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+          readinessProbe:
+            exec:
+              command: [python, -c, 'import urllib.request; urllib.request.urlopen("http://127.0.0.1:8080/", timeout=2).close()']
+            periodSeconds: 5
+          resources:
+            requests: {cpu: 25m, memory: 32Mi}
+            limits: {cpu: 250m, memory: 128Mi}
+          volumeMounts:
+            - {name: fixture, mountPath: /fixture, readOnly: true}
+      volumes:
+        - name: fixture
+          configMap: {name: selenium-grid-fixture}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 2Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: selenium-grid
+  namespace: llms
+spec:
+  selector: {app: selenium-grid}
+  ports:
+    - {name: webdriver, port: 4444, targetPort: 4444}
+---
+# Browser egress stays denied. Synthetic data URLs need no network access.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: selenium-grid-synthetic-only
+  namespace: llms
+spec:
+  podSelector:
+    matchLabels: {app: selenium-grid}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector: {}
+      ports:
+        - {protocol: TCP, port: 4444}
+  egress: []
