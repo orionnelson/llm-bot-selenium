@@ -160,7 +160,8 @@ def handler(dag_path, assets, *, test_mode=False, recordings=None):
                 node_id, instructions = value['nodeId'], value['instructions']
                 if not isinstance(node_id, str) or not isinstance(instructions, str) or not 1 <= len(instructions) <= 12000:
                     raise ValueError('Invalid generation request')
-                dag = DAG.from_spec(snapshot(dag_path)['definition'])
+                current = snapshot(dag_path)
+                dag = DAG.from_spec(current['definition'])
                 if not any(t.task_id == node_id for t in dag.tasks):
                     return self.reply(409, {'error': 'Save the DAG before generating for this task'})
             except (ValueError, TypeError, KeyError, SyntaxError, OSError, RecursionError, AttributeError):
@@ -169,7 +170,11 @@ def handler(dag_path, assets, *, test_mode=False, recordings=None):
             if not generation_lock.acquire(blocking=False):
                 return self.reply(429, {'error': 'Test generation already in progress'})
             try:
-                return self.reply(200, generate(dag, node_id, instructions))
+                candidate = generate(dag, node_id, instructions)
+                with dag_lock:
+                    if snapshot(dag_path)['revision'] != current['revision']:
+                        return self.reply(409, {'error': 'DAG changed during generation; candidate discarded. Reload before generating again'})
+                    return self.reply(200, candidate)
             except Exception:
                 return self.reply(502, {'error': 'Test model unavailable or candidate invalid; no source applied/executed'})
             finally:
