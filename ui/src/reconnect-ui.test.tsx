@@ -37,3 +37,24 @@ it('disables input reconnection in recorded replay and ignores stale UI callback
  expect(useStudio.getState().workflow).toEqual(w);expect(useStudio.getState().past).toEqual([]);
  useStudio.setState({mode:'Demo',run:undefined});
 });
+
+it('retains controlled wire selection so Delete and the disconnect button can remove it',()=>{
+ const w=template();useStudio.setState({workflow:w,past:[],future:[],mode:'Demo',run:undefined});
+ const html=renderToString(<ReactFlowProvider><App/></ReactFlowProvider>);
+ const props=captured.props,edge=w.edges[0];
+ expect(html).toContain('Disconnect selected');
+ props.onEdgesChange([{id:edge.id,type:'select',selected:true}]);
+ props.onNodesChange([{id:w.nodes[0].id,type:'select',selected:false}]);
+ expect(useStudio.getState().workflow.edges[0].selected).toBe(true);
+ expect(useStudio.getState().past).toHaveLength(0);
+ const nodes=useStudio.getState().workflow.nodes;
+ props.onEdgesDelete([edge]);
+ expect(useStudio.getState().workflow.edges.map(e=>e.id)).not.toContain(edge.id);
+ expect(useStudio.getState().workflow.nodes).toEqual(nodes);
+ useStudio.getState().undo();expect(useStudio.getState().workflow.edges).toHaveLength(w.edges.length);
+ useStudio.setState({mode:'Replay',run:makeRun(w,'errors')});
+ const before=useStudio.getState().workflow;
+ props.onEdgesDelete([edge]);
+ expect(useStudio.getState().workflow).toEqual(before);
+ useStudio.setState({mode:'Demo',run:undefined});
+});
