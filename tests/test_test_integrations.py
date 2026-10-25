@@ -254,6 +254,7 @@ class PublicGridTests(unittest.TestCase):
     def driver(self):
         driver = Mock(title='Orion', current_url='https://or9.ca/',
                       capabilities={'browserName': 'MicrosoftEdge'})
+        driver.execute_script.return_value = 'https://or9.ca/'
         driver.execute_cdp_cmd.return_value = {'arguments': ['--headless=new']}
         driver.find_element.return_value.is_displayed.return_value = True
         return driver
@@ -270,9 +271,10 @@ class PublicGridTests(unittest.TestCase):
         driver.quit.assert_called_once()
 
     def test_public_failures_never_report_success_and_always_quit(self):
-        for failure in ('redirect', 'empty-title', 'hidden-body', 'navigation', 'wrong-browser', 'unsafe'):
+        for failure in ('redirect', 'empty-title', 'hidden-body', 'navigation', 'wrong-browser', 'unsafe', 'error-document'):
             with self.subTest(failure=failure):
                 driver = self.driver()
+                if failure == 'error-document': driver.execute_script.return_value = 'chrome-error://chromewebdata/'
                 if failure == 'redirect': driver.current_url = 'https://other.example/'
                 if failure == 'empty-title': driver.title = ' '
                 if failure == 'hidden-body': driver.find_element.return_value.is_displayed.return_value = False
