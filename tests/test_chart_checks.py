@@ -148,6 +148,27 @@ class ChartJourneyTests(unittest.TestCase):
         result = investigate_chart(self.issue, self.check, FakeBrowser(self.view), now=100)
         self.assertEqual(result['conclusion']['state'], 'unknown')
 
+    def test_investigation_rejects_every_observer_event_not_only_check_source(self):
+        observer = SyntheticObserver('sre', [self.binding], consent=True)
+        earlier = replace(self.view, evidence_id='earlier-observer', value=7)
+        observer.record('navigate', 'entity-chart', earlier)
+        observer.record('shortcut-open-chart', 'dashboard', self.view)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        for value in (0, 7):
+            with self.subTest(value=value):
+                bot = FakeBrowser(replace(earlier, value=value))
+                result = investigate_chart(issue, check, bot, now=100)
+                self.assertEqual(result['observed']['state'], 'healthy')
+                self.assertEqual(result['route'], 'entity-chart')
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertEqual(result['conclusion']['evidence'], 'earlier-observer')
+                self.assertEqual(result['conclusion']['uncertainty'], 'reused observer evidence')
+                self.assertEqual(bot.reads, [('entity-chart', self.binding)])
+        bot = FakeBrowser(replace(earlier, evidence_id='independent-bot'))
+        self.assertEqual(investigate_chart(issue, check, bot, now=100)['conclusion']['state'], 'failure')
+        self.assertEqual(issue.events[0].view, earlier)
+
     def monitor(self, end=1600):
         return ReleaseMonitor(ReleasePlan(self.check, 100, end))
 
