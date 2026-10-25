@@ -1,0 +1,112 @@
+{
+  "version": "ui-component-capture/v1",
+  "source": "running deployed app, synthetic template only",
+  "browser": "MicrosoftEdge",
+  "browserVersion": "155.0.4283.45",
+  "viewport": {
+    "width": 1800,
+    "height": 1200
+  },
+  "isolation": {
+    "mode": "container",
+    "browserSandbox": false
+  },
+  "canonicalWorkflowUnchanged": true,
+  "captureOnly": true,
+  "shots": [
+    {
+      "name": "01-toolbar",
+      "component": "Global toolbar and project controls, synthetic template",
+      "selector": ".topbar",
+      "sha256": "99228dea9c2572e06004d6bd0889e1670dac66351a3b95b397ec0841172085b0"
+    },
+    {
+      "name": "02-components",
+      "component": "Component library and category palette",
+      "selector": ".sidebar",
+      "sha256": "07d77520906d2f3a8b88f66674821af027eea85f8388cd15bb2b87cd0c0defd9"
+    },
+    {
+      "name": "03-canvas",
+      "component": "Chart, scenario toolbar, minimap and resize boundaries",
+      "selector": "section.center",
+      "sha256": "19ebb4c2cbddf98a8dd2c9b847229dac3c78b80cd7772aa9eaa85886a22d4182"
+    },
+    {
+      "name": "04-inspector",
+      "component": "Selected Lambda configuration, connection and explanation panels",
+      "selector": ".inspector",
+      "sha256": "273fd970206fa686fb60215b5389ab9b89f8835e22a3886164b139a94e63898e"
+    },
+    {
+      "name": "05-python",
+      "component": "Selected component Python inspector, starter code only",
+      "selector": ".inspector",
+      "sha256": "4d9c0d5e020168445be58ed78015155099ace990c3ecd788cc17283e0da1a13d"
+    },
+    {
+      "name": "06-task-dag",
+      "component": "Selected component functional DAG projection",
+      "selector": ".inspector",
+      "sha256": "c33b89d1db8cea3845e7e060b66e78d75590d0ada00bda1833dd7b9f154fa491"
+    },
+    {
+      "name": "07-browser-policy",
+      "component": "Browser runner safe empty/policy-blocker state; cropped before private recordings",
+      "sha256": "71c298bfbe695dbeb57bcdd2bacb777ef6495cf640731978f377a43d1bb7cd58"
+    },
+    {
+      "name": "08-triage",
+      "component": "Empty triage/snippet designer",
+      "selector": ".browser-panel",
+      "sha256": "e2b0352617d371a673e467eabf857f5e88f66c5a0f61d0d04f5c5f29372c2d12"
+    },
+    {
+      "name": "09-debugger",
+      "component": "Debugger navigation/empty state, no private run selected",
+      "selector": ".debugger",
+      "sha256": "4c3c848164557a82a3d1d4b1e543a2ec7cb641cd9661688adf99485daf567a48"
+    },
+    {
+      "name": "10-history-controls",
+      "component": "Demo history and Python/JSON import/export controls",
+      "status": "blocked",
+      "reason": "Component not visible in current layout; not forced or fabricated"
+    },
+    {
+      "name": "11-history-table",
+      "component": "Empty synthetic demo history table",
+      "status": "blocked",
+      "reason": "Component not visible in current layout; not forced or fabricated"
+    },
+    {
+      "name": "12-dag-dialog",
+      "component": "Functional Python DAG dialog for synthetic template",
+      "selector": ".modal",
+      "sha256": "1c46ab4a8606e27bd54ac2d5ce277f71a514a02b23e9b8ed73c1a6e0be2cd3e8"
+    },
+    {
+      "name": "13-share-dialog",
+      "component": "Share/export-only dialog",
+      "selector": ".modal",
+      "sha256": "95c55b3817f918d659b609c35372fb00f405acc48b5681afedbe796f65ad332d"
+    },
+    {
+      "name": "14-schedule-dialog",
+      "component": "Scheduling unavailability and export state",
+      "selector": ".modal",
+      "sha256": "7a8af5507def5c64a25df4dea99145eb0faccc3de69383d14ec6897280211598"
+    },
+    {
+      "name": "15-control-flow",
+      "component": "Structured loop, BODY/DONE and IF/ELSE component design",
+      "selector": "section.center",
+      "sha256": "05297d15a6ab418277070a48d6816b9a0cf552f7fdf73a534b8c9f219777ded7"
+    }
+  ],
+  "missing": [
+    "active Grid session and private recording timeline excluded to avoid private data; capture a fresh synthetic recording separately",
+    "mobile/responsive, keyboard/focus, loading and all error variants not an exhaustive audit"
+  ],
+  "sessionClosed": true
+}
