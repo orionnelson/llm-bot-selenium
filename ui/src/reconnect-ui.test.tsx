@@ -58,3 +58,20 @@ it('retains controlled wire selection so Delete and the disconnect button can re
  expect(useStudio.getState().workflow).toEqual(before);
  useStudio.setState({mode:'Demo',run:undefined});
 });
+
+it('defers resize metadata without overwriting a newer wire selection or a replay draft',()=>{
+ const w=template();useStudio.setState({workflow:w,past:[],future:[],mode:'Demo',run:undefined});
+ renderToString(<ReactFlowProvider><App/></ReactFlowProvider>);
+ const props=captured.props,frames:FrameRequestCallback[]=[];
+ vi.stubGlobal('requestAnimationFrame',(callback:FrameRequestCallback)=>{frames.push(callback);return frames.length;});
+ try{
+  props.onNodesChange([{id:w.nodes[0].id,type:'dimensions',dimensions:{width:130,height:80}}]);
+  expect(useStudio.getState().workflow.nodes[0].measured).toBeUndefined();
+  props.onEdgesChange([{id:w.edges[0].id,type:'select',selected:true}]);frames[0](0);
+  expect(useStudio.getState().workflow.nodes[0].measured).toMatchObject({width:130,height:80});
+  expect(useStudio.getState().workflow.edges[0].selected).toBe(true);
+  props.onNodesChange([{id:w.nodes[0].id,type:'dimensions',dimensions:{width:140,height:90}}]);
+  useStudio.setState({mode:'Replay',run:makeRun(w,'errors')});const before=useStudio.getState().workflow;frames[1](0);
+  expect(useStudio.getState().workflow).toBe(before);
+ }finally{vi.unstubAllGlobals();useStudio.setState({mode:'Demo',run:undefined});}
+});
