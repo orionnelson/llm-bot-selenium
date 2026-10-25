@@ -32,16 +32,21 @@ class SeleniumChartPort(SeleniumPort):
     def read_visible(self, binding, route):
         binding.check()
         self._origin_check()
-        if route not in ('dashboard', 'entity-chart') or urlsplit(self.driver.current_url).path != '/chart/' + route:
+        url = self.driver.current_url
+        if route not in ('dashboard', 'entity-chart') or urlsplit(url).path != '/chart/' + route:
             raise GuardError('unexpected synthetic chart route')
         element = self._wait('[data-chart-view]')
         self._origin_check()
+        if self.driver.current_url != url:
+            raise GuardError('chart URL changed during read')
         if not element.is_displayed():
             raise GuardError('chart evidence is not visible')
         try:
             payload = element.get_attribute('data-chart-view')
             text = element.text
             self._origin_check()
+            if self.driver.current_url != url:
+                raise GuardError('chart URL changed during read')
             if not payload or len(payload) > 8192 or len(text) > 80:
                 raise ValueError('chart payload budget')
             data = json.loads(payload)
