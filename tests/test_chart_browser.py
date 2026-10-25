@@ -168,6 +168,72 @@ class ChartDOMTests(unittest.TestCase):
             with self.assertRaises(GuardError):
                 self.sre.read_visible(self.binding, 'dashboard')
 
+    def test_same_origin_navigation_during_read_is_rejected(self):
+        for stage in ('wait', 'payload', 'text'):
+            for target in ('/chart/entity-chart', '/login', '/chart/dashboard?changed=filters'):
+                with self.subTest(stage=stage, target=target):
+                    self.sre.read_chart('dashboard', self.binding)
+                    element = self.sre.driver.find_element(None, '[data-chart-view]')
+                    payload, text = element.get_attribute('data-chart-view'), element.text
+                    port = self.sre
+                    reads = []
+
+                    class NavigatingElement:
+                        def is_displayed(self):
+                            return True
+
+                        def get_attribute(self, name):
+                            reads.append('payload')
+                            if stage == 'payload':
+                                port.driver.current_url = self.origin + target
+                            return payload
+
+                        @property
+                        def text(self):
+                            reads.append('text')
+                            if stage == 'text':
+                                port.driver.current_url = self.origin + target
+                            return text
+
+                    wrapped = NavigatingElement()
+                    wrapped.origin = self.origin
+                    def wait(selector):
+                        if stage == 'wait':
+                            port.driver.current_url = self.origin + target
+                        return wrapped
+                    original_wait = port._wait
+                    port._wait = wait
+                    observer = SyntheticObserver(port.session, [self.binding], consent=True)
+                    try:
+                        with self.assertRaises(GuardError):
+                            port.capture(observer, 'navigate', 'dashboard', self.binding)
+                        self.assertEqual(observer.events, [])
+                        if stage == 'wait':
+                            self.assertEqual(reads, [])
+                    finally:
+                        port._wait = original_wait
+
+    def test_navigation_during_bot_read_is_unknown_then_recovers_for_release(self):
+        issue, check = self.issue()
+        original_wait = self.bot._wait
+        def redirect(selector):
+            element = original_wait(selector)
+            self.bot.driver.current_url = self.origin + '/login'
+            return element
+        self.bot._wait = redirect
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        try:
+            self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'unknown')
+            result = monitor.tick(100, self.bot)
+            self.assertEqual(result['state'], 'unknown')
+            self.assertTrue(result['report'])
+            self.assertEqual(monitor.seen_evidence, {check.source_evidence})
+        finally:
+            self.bot._wait = original_wait
+        self.now = 400
+        self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=400)['conclusion']['state'], 'healthy')
+
     def test_redirect_during_wait_is_rejected_before_reading_payload(self):
         self.sre.read_chart('dashboard', self.binding)
         element = Mock()
