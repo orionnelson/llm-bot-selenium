@@ -1,0 +1,41 @@
+{
+  "source_base": "8704ffb0c5b2a6405aeaadc3aac1e5a4bc9faf94",
+  "chart_reader_sha256": "9b8101ce3ae015e7cb5276e7999eaa176146c7a0912292448cdc0f5b57a55315",
+  "transport": "actual loopback HTTP; Selenium waits with fake DOM, not rendered browser",
+  "observed_semantic_events": 2,
+  "rejected_observer_events": 0,
+  "investigation": {
+    "state": "unknown",
+    "evidence": null,
+    "uncertainty": "chart read failed"
+  },
+  "release": {
+    "state": "unknown",
+    "evidence": null,
+    "uncertainty": "chart read failed",
+    "duplicate": false,
+    "report": true
+  },
+  "recovery": {
+    "state": "healthy",
+    "evidence": "fresh-400",
+    "value": 0,
+    "maximum": 1,
+    "uncertainty": "numeric chart condition only; not root cause",
+    "duplicate": false,
+    "report": false
+  },
+  "fresh_failure": {
+    "state": "failure",
+    "evidence": "fresh-700",
+    "value": 8,
+    "maximum": 1,
+    "uncertainty": "numeric chart condition only; not root cause",
+    "duplicate": false,
+    "report": true
+  },
+  "bounded_end_stopped": true,
+  "rendered_screenshot": false,
+  "model_inference": false,
+  "production": false
+}

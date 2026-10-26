@@ -3,7 +3,7 @@ from dataclasses import replace
 import importlib.util
 import threading
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
 from triage.chart_browser import SeleniumChartPort
@@ -11,7 +11,7 @@ from triage.chart_checks import (ChartBinding, ChartView, SyntheticObserver, Cha
                                  investigate_chart, ReleasePlan, ReleaseMonitor)
 from triage.core import Action, Context, GuardError
 from triage.mock_server import make_server
-from test_selenium_contract import FakeHTTPDriver
+from test_selenium_contract import FakeHTTPDriver, Element
 
 
 @unittest.skipUnless(importlib.util.find_spec('selenium'), 'Selenium package required')
@@ -69,6 +69,42 @@ class ChartDOMTests(unittest.TestCase):
         reads = len(self.routes)
         self.assertIsNone(monitor.tick(1000, self.bot))
         self.assertEqual(len(self.routes), reads)
+
+    def test_duplicate_json_evidence_is_rejected_before_observation_and_recovers(self):
+        issue, check = self.issue()
+        original_get = Element.get_attribute
+        # Every conflicting pair used to keep the final (apparently healthy) value.
+        pairs = [('"session_valid": true', '"session_valid": false, "session_valid": true'),
+                 ('"sample_at": 100', '"sample_at": -400, "sample_at": 100'),
+                 ('"chart": "error-rate"', '"chart": "other", "chart": "error-rate"'),
+                 ('"function": "checkout"', '"function": "other", "function": "checkout"')]
+        for old, ambiguous in pairs:
+            with self.subTest(field=old):
+                def get_attribute(element, name):
+                    value = original_get(element, name)
+                    if name == 'data-chart-view':
+                        self.assertIn(old, value)
+                        return value.replace(old, ambiguous, 1)
+                    return value
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+                with patch.object(Element, 'get_attribute', get_attribute):
+                    with self.assertRaises(GuardError):
+                        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                    self.assertEqual(observer.events, [])
+                    result = investigate_chart(issue, check, self.bot, now=100)
+                    self.assertEqual(result['conclusion']['state'], 'unknown')
+                    self.assertIsNone(result['conclusion']['evidence'])
+                    result = monitor.tick(100, self.bot)
+                    self.assertEqual(result['state'], 'unknown')
+                    self.assertTrue(result['report'])
+                    self.assertIsNone(result['evidence'])
+                    self.assertEqual(monitor.seen_evidence, {check.source_evidence})
+                self.now = 400
+                result = monitor.tick(400, self.bot)
+                self.assertEqual(result['state'], 'healthy')
+                self.assertFalse(result['report'])
+                self.now = 100
 
     def test_http_dom_sample_newer_than_capture_is_not_trusted(self):
         issue, check = self.issue()
