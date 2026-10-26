@@ -13,6 +13,13 @@ from .core import Action, Context, GuardError
 from .selenium_port import SeleniumPort
 
 
+def _unique_fields(pairs):
+    data = dict(pairs)
+    if len(data) != len(pairs):
+        raise ValueError('duplicate chart evidence fields')
+    return data
+
+
 def binding_from_data(data):
     binding = ChartBinding(Context(**data['context']), Action(**data['action']),
                            data['chart'], data['label'], tuple(tuple(p) for p in data['filters']))
@@ -49,7 +56,7 @@ class SeleniumChartPort(SeleniumPort):
                 raise GuardError('chart URL changed during read')
             if not payload or len(payload) > 8192 or len(text) > 80:
                 raise ValueError('chart payload budget')
-            data = json.loads(payload)
+            data = json.loads(payload, object_pairs_hook=_unique_fields)
             if type(data) is not dict:
                 raise ValueError('chart object required')
             actual = binding_from_data(data.pop('binding'))
