@@ -101,7 +101,7 @@ def handler(dag_path, assets, *, test_mode=False, recordings=None):
                         grid = {**status(os.environ['SELENIUM_GRID_URL']), 'status': 'reachable'}
                     except Exception:
                         grid = {'ready': False, 'status': 'unreachable or invalid'}
-                return self.reply(200, {'mode': 'test', 'generator': MODEL, 'grid': grid, 'execution': 'consented-test-browser-actions', 'generatedPythonExecution': False, 'modelBusy': generation_lock.locked(), 'approvedUrls': sorted(browser_runs.urls), 'videoAvailable': shutil.which('ffmpeg') is not None})
+                return self.reply(200, {'mode': 'test', 'generator': MODEL, 'grid': grid, 'execution': 'consented-test-browser-actions', 'generatedPythonExecution': False, 'browserFunctionExecution': 'validated-ast-operations', 'modelBusy': generation_lock.locked(), 'approvedUrls': sorted(browser_runs.urls), 'videoAvailable': shutil.which('ffmpeg') is not None})
             if urlsplit(self.path).path == '/api/dag':
                 try:
                     return self.reply(200, snapshot(dag_path))
@@ -121,6 +121,20 @@ def handler(dag_path, assets, *, test_mode=False, recordings=None):
             self.close_connection = True
             if not self.local_request():
                 return self.reply(403, {'error': 'Local same-origin requests only'})
+            if self.path == '/api/browser/journeys':
+                if not browser_runs: return self.reply(503, {'error': 'Browser execution disabled'})
+                if self.headers.get_content_type() != 'application/json' or self.headers.get('Transfer-Encoding'):
+                    return self.reply(415, {'error': 'Send application/json'})
+                try:
+                    size = int(self.headers.get('Content-Length', '0'))
+                    if not 0 < size <= 8192: return self.reply(413, {'error': 'Journey instructions exceed bounds'})
+                    payload = json.loads(self.rfile.read(size))
+                    if not isinstance(payload, dict) or set(payload) != {'url', 'steps'}: raise ValueError('Enter a URL and steps')
+                    from .journey import start_journey
+                    return self.reply(202, start_journey(browser_runs, payload['url'], payload['steps']))
+                except BlockingIOError: return self.reply(429, {'error': 'A browser/model operation is already active'})
+                except (ValueError, TypeError, KeyError) as exc: return self.reply(400, {'error': str(exc)})
+                except OSError: return self.reply(503, {'error': 'Grid, public DNS or recording storage unavailable'})
             if self.path.startswith('/api/browser/runs'):
                 if not browser_runs:
                     return self.reply(503, {'error': 'Test browser execution disabled'})
