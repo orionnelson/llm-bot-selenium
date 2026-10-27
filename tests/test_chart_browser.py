@@ -141,6 +141,12 @@ class ChartDOMTests(unittest.TestCase):
                 self.assertEqual(result['conclusion']['state'], 'unknown')
                 self.assertEqual(result['conclusion']['evidence'], earlier)
                 self.assertEqual(self.sre.driver.current_url, original_url)
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                release = monitor.tick(100, self.bot)
+                self.assertEqual(release['state'], 'unknown')
+                self.assertEqual(release['evidence'], earlier)
+                self.assertTrue(release['report'])
+                self.assertEqual(monitor.seen_evidence, {earlier, check.source_evidence})
         self.changes = {}
         self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'failure')
         monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))

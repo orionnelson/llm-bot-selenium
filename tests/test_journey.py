@@ -2,6 +2,7 @@
 import json
 import os
 from pathlib import Path
+from socket import getaddrinfo
 import tempfile
 from threading import Lock
 import unittest
@@ -81,7 +82,8 @@ class JourneyTests(unittest.TestCase):
         for proposed in [{'action':'click','candidate':'missing','evidence':'hash','result':''},{'action':'click','candidate':'c0','evidence':'hash','result':''},{'action':'finish','candidate':None,'evidence':'other','result':''},{'action':'execute','candidate':'c0','evidence':'hash','result':''}]:
             with patch('triage.journey.complete',return_value=json.dumps(proposed)),self.assertRaises(ValueError):propose_step('Inspect',observation)
 
-    @patch('triage.public_browser.socket.getaddrinfo', return_value=PUBLIC)
+    @patch('triage.public_browser.socket.getaddrinfo', side_effect=lambda host, *args, **kwargs:
+           getaddrinfo(host, *args, **kwargs) if host == '127.0.0.1' else PUBLIC)
     def test_api_rejects_internal_url_and_bounded_bad_instructions_without_execution(self,*_):
         with backend(test_mode=True) as (port,_,_):
             for body in [{'url':'http://localhost/','steps':['inspect']},{'url':'https://or9.ca/','steps':[]},{'url':'https://or9.ca/','steps':['']},{'url':'https://or9.ca/','steps':['inspect']*9}]:
