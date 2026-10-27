@@ -128,11 +128,16 @@ class ChartCheck:
     maximum: float
     source_evidence: str
     observer_session: str
+    observer_evidence: tuple[str, ...] = ()
 
     def __post_init__(self):
         self.binding.check()
         identifier(self.source_evidence)
         identifier(self.observer_session)
+        if type(self.observer_evidence) is not tuple or len(self.observer_evidence) > 100:
+            raise GuardError('bounded immutable observer evidence required')
+        for evidence in self.observer_evidence:
+            identifier(evidence)
         if type(self.maximum) not in (int, float) or not math.isfinite(self.maximum) or self.maximum < 0:
             raise GuardError('explicit finite nonnegative maximum required')
 
@@ -144,7 +149,8 @@ class ChartCheck:
             raise GuardError('explicit finite nonnegative maximum required')
         view = issue.events[-1].view
         view.verify(view.binding, now)
-        return cls(view.binding, maximum, view.evidence_id, issue.observer_session)
+        return cls(view.binding, maximum, view.evidence_id, issue.observer_session,
+                   tuple(event.view.evidence_id for event in issue.events))
 
     def evaluate(self, view, now):
         try:
@@ -208,7 +214,7 @@ class ReleaseMonitor:
         self.last_state = None
         self.last_tick = -1
         # At most one read per cadence slot in the <=24h release window.
-        self.seen_evidence = {plan.check.source_evidence}
+        self.seen_evidence = {plan.check.source_evidence, *plan.check.observer_evidence}
 
     def stop(self):
         self.stopped = True

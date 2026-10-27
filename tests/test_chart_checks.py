@@ -320,6 +320,37 @@ class ChartJourneyTests(unittest.TestCase):
         self.assertIsNone(result['evidence'])
         self.assertNotIn('password', str(result))
 
+    def test_release_rejects_every_observer_event_before_fresh_recovery(self):
+        observer = SyntheticObserver('sre', [self.binding], consent=True)
+        earlier = replace(self.view, evidence_id='earlier-observer', value=7)
+        observer.record('navigate', 'entity-chart', earlier)
+        observer.record('shortcut-open-chart', 'dashboard', self.view)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        for value in (0, 7):
+            with self.subTest(value=value):
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                bot = FakeBrowser(replace(earlier, value=value))
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertEqual(result['evidence'], 'earlier-observer')
+                self.assertTrue(result['report'])
+                self.assertEqual(monitor.seen_evidence, {'observed-1', 'earlier-observer'})
+                bot.view = replace(self.view, evidence_id='fresh-400', captured_at=400, sample_at=400)
+                self.assertEqual(monitor.tick(400, bot)['state'], 'healthy')
+                bot.view = replace(bot.view, evidence_id='fresh-700', captured_at=700, sample_at=700, value=7)
+                self.assertTrue(monitor.tick(700, bot)['report'])
+                self.assertIsNone(monitor.tick(1000, bot))
+                self.assertTrue(monitor.stopped)
+        self.assertEqual(issue.events[0].view, earlier)
+
+    def test_check_observer_evidence_is_bounded_immutable_and_semantic(self):
+        for invalid in (['earlier'], ('raw password!',), tuple('e' for _ in range(101))):
+            with self.subTest(invalid=type(invalid).__name__), self.assertRaises(GuardError):
+                replace(self.check, observer_evidence=invalid)
+        legacy = ChartCheck(self.binding, 1, 'observed-1', 'sre')
+        self.assertEqual(ReleaseMonitor(ReleasePlan(legacy, 100, 1000)).seen_evidence, {'observed-1'})
+
     def test_plan_bounds_and_schema_guards(self):
         for start, end, cadence in [(100, 100, 300), (100, 999999, 300), (-1, 100, 300),
                                     (0, 100, 0), (0, 100, True)]:
