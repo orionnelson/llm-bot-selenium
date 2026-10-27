@@ -1,12 +1,16 @@
 """Real loopback HTTP + fake DOM, NOT rendered browser or model acceptance."""
-from dataclasses import replace
+from dataclasses import asdict, replace
+import json
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import urlopen
 import importlib.util
 import threading
 import unittest
 from unittest.mock import Mock, patch
 from uuid import uuid4
 
-from triage.chart_browser import SeleniumChartPort
+from triage.chart_browser import SeleniumChartPort, binding_from_data
 from triage.chart_checks import (ChartBinding, ChartView, SyntheticObserver, ChartCheck,
                                  investigate_chart, ReleasePlan, ReleaseMonitor)
 from triage.core import Action, Context, GuardError
@@ -45,6 +49,68 @@ class ChartDOMTests(unittest.TestCase):
         issue = observer.stop()
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
+
+    def test_filter_wire_shapes_are_not_silently_coerced(self):
+        cases = [((), ''), ((), {}), ((('a', 'b'),), ['ab']),
+                 ((('a', 'b'),), {'ab': 'ignored'}), ((('a', 'b'),), [{'a': 1, 'b': 2}])]
+        for expected, malformed in cases:
+            with self.subTest(filters=malformed):
+                binding = replace(self.binding, filters=expected)
+                data = json.loads(json.dumps(asdict(binding)))
+                self.assertEqual(binding_from_data(data), binding)
+                data['filters'] = malformed
+                with self.assertRaises(GuardError):
+                    binding_from_data(data)
+
+    def test_http_rejects_malformed_filter_requests_before_chart_read(self):
+        for malformed in ('', {}, ['ab'], {'ab': 'ignored'}):
+            with self.subTest(filters=malformed):
+                data = asdict(self.binding)
+                data['filters'] = malformed
+                url = self.origin + '/chart/dashboard?' + urlencode({'binding': json.dumps(data)})
+                with self.assertRaises(HTTPError) as error:
+                    urlopen(url, timeout=5)
+                self.assertEqual(error.exception.code, 400)
+                self.assertEqual(self.routes, [])
+        self.sre.read_chart('dashboard', self.binding)
+        self.assertEqual(self.routes, ['dashboard'])
+
+    def test_malformed_filter_evidence_is_unknown_then_fresh_release_recovers(self):
+        self.binding = replace(self.binding, filters=(('a', 'b'),))
+        issue, check = self.issue()
+        original_get = Element.get_attribute
+        def malformed_filters(element, name):
+            payload = original_get(element, name)
+            if name == 'data-chart-view':
+                data = json.loads(payload)
+                data['binding']['filters'] = ['ab']
+                return json.dumps(data)
+            return payload
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1300))
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        with patch.object(Element, 'get_attribute', malformed_filters):
+            with self.subTest(phase='observer'):
+                with self.assertRaises(GuardError):
+                    self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(observer.events, [])
+            with self.subTest(phase='investigation'):
+                result = investigate_chart(issue, check, self.bot, now=100)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIsNone(result['conclusion']['evidence'])
+            with self.subTest(phase='release'):
+                result = monitor.tick(100, self.bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertTrue(result['report'])
+                self.assertIsNone(result['evidence'])
+                self.assertEqual(monitor.seen_evidence, set(check.observer_evidence))
+        self.now = 400
+        self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+        self.value, self.now = 8, 700
+        self.assertTrue(monitor.tick(700, self.bot)['report'])
+        self.now = 1000
+        self.assertTrue(monitor.tick(1000, self.bot)['duplicate'])
+        self.assertIsNone(monitor.tick(1300, self.bot))
+        self.assertTrue(monitor.stopped)
 
     def test_http_dom_observation_independent_navigation_and_release_reuse(self):
         issue, check = self.issue()

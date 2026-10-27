@@ -21,6 +21,8 @@ def _unique_fields(pairs):
 
 
 def binding_from_data(data):
+    if type(data['filters']) is not list or any(type(pair) is not list or len(pair) != 2 for pair in data['filters']):
+        raise GuardError('filter list of key/value lists required')
     binding = ChartBinding(Context(**data['context']), Action(**data['action']),
                            data['chart'], data['label'], tuple(tuple(p) for p in data['filters']))
     if set(data) != {'context', 'action', 'chart', 'label', 'filters'}:
