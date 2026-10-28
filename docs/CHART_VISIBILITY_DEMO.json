@@ -1,0 +1,58 @@
+{
+  "source_base": "c80df75844e5e23f59247c5881ea0805cc511622",
+  "chart_browser_sha256": "5ba27c15c44560bf6ac72e7fc0570e005fe42b09069b4d81c82f210ea4fdddce",
+  "hidden_observation_events": 0,
+  "transport": "actual loopback HTTP and Selenium waits; fake DOM driver, not rendered browser",
+  "observer_events": [
+    "navigate",
+    "shortcut-open-chart"
+  ],
+  "retained_observer_evidence": [
+    "earlier-observer",
+    "last-observer"
+  ],
+  "independent_investigation": {
+    "state": "unknown",
+    "evidence": null,
+    "uncertainty": "chart read failed"
+  },
+  "hidden_release": {
+    "state": "unknown",
+    "evidence": null,
+    "uncertainty": "chart read failed",
+    "duplicate": false,
+    "report": true
+  },
+  "fresh_healthy": {
+    "state": "healthy",
+    "evidence": "fresh-400",
+    "value": 0,
+    "maximum": 1,
+    "uncertainty": "numeric chart condition only; not root cause",
+    "duplicate": false,
+    "report": false
+  },
+  "fresh_failure": {
+    "state": "failure",
+    "evidence": "fresh-700",
+    "value": 8,
+    "maximum": 1,
+    "uncertainty": "numeric chart condition only; not root cause",
+    "duplicate": false,
+    "report": true
+  },
+  "deduplicated_failure": {
+    "state": "failure",
+    "evidence": "fresh-1000",
+    "value": 8,
+    "maximum": 1,
+    "uncertainty": "numeric chart condition only; not root cause",
+    "duplicate": true,
+    "report": false
+  },
+  "bounded_end_stopped": true,
+  "rendered_browser": false,
+  "model_inference": false,
+  "recording": false,
+  "production": false
+}

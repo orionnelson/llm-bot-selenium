@@ -53,6 +53,8 @@ class SeleniumChartPort(SeleniumPort):
         try:
             payload = element.get_attribute('data-chart-view')
             text = element.text
+            if not element.is_displayed():
+                raise GuardError('chart evidence became hidden during read')
             self._origin_check()
             if self.driver.current_url != url:
                 raise GuardError('chart URL changed during read')
