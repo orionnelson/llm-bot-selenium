@@ -53,6 +53,8 @@ class SeleniumChartPort(SeleniumPort):
         try:
             payload = element.get_attribute('data-chart-view')
             text = element.text
+            if element.get_attribute('data-chart-view') != payload:
+                raise GuardError('chart evidence changed during read')
             if not element.is_displayed():
                 raise GuardError('chart evidence became hidden during read')
             self._origin_check()

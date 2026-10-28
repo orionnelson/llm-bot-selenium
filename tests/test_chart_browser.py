@@ -50,6 +50,69 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_chart_payload_changed_during_text_collection_is_not_observed(self):
+        self.sre.read_chart('dashboard', self.binding)
+        original_get = Element.get_attribute
+        for change in ({'session_valid': False}, {'state': 'loading'}, {'evidence_id': 'replaced'}, None):
+            with self.subTest(change=change):
+                observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+                reads = {}
+                def changing_payload(element, name):
+                    payload = original_get(element, name)
+                    if name == 'data-chart-view':
+                        reads[id(element)] = reads.get(id(element), 0) + 1
+                        if reads[id(element)] > 1:
+                            if change is None:
+                                return None
+                            data = json.loads(payload)
+                            data.update(change)
+                            return json.dumps(data)
+                    return payload
+                with patch.object(Element, 'get_attribute', changing_payload):
+                    with self.assertRaises(GuardError):
+                        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(observer.events, [])
+                self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(len(observer.events), 1)
+
+    def test_changed_chart_payload_is_unknown_then_release_recovers(self):
+        issue, check = self.issue()
+        original_get = Element.get_attribute
+        for change in ({'session_valid': False}, {'state': 'loading'}, {'evidence_id': 'replaced'}, None):
+            with self.subTest(change=change):
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1300))
+                reads = {}
+                def changing_payload(element, name):
+                    payload = original_get(element, name)
+                    if name == 'data-chart-view':
+                        reads[element] = reads.get(element, 0) + 1
+                        if reads[element] > 1:
+                            if change is None:
+                                return None
+                            data = json.loads(payload)
+                            data.update(change)
+                            return json.dumps(data)
+                    return payload
+                self.now, self.value = 100, 0
+                with patch.object(Element, 'get_attribute', changing_payload):
+                    result = investigate_chart(issue, check, self.bot, now=100)
+                    tick = monitor.tick(100, self.bot)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIsNone(result['conclusion']['evidence'])
+                self.assertEqual(tick['state'], 'unknown')
+                self.assertIsNone(tick['evidence'])
+                self.assertTrue(tick['report'])
+                self.assertEqual(monitor.seen_evidence, set(check.observer_evidence))
+                self.assertFalse(monitor.stopped)
+                self.now = 400
+                self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+                self.now, self.value = 700, 8
+                self.assertTrue(monitor.tick(700, self.bot)['report'])
+                self.now = 1000
+                self.assertFalse(monitor.tick(1000, self.bot)['report'])
+                self.assertIsNone(monitor.tick(1300, self.bot))
+                self.assertTrue(monitor.stopped)
+
     def test_chart_hidden_after_text_collection_is_not_observed(self):
         self.sre.read_chart('dashboard', self.binding)
         observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
