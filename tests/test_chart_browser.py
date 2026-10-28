@@ -50,6 +50,54 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_chart_hidden_after_text_collection_is_not_observed(self):
+        self.sre.read_chart('dashboard', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        original = Element.is_displayed
+        def displayed(element):
+            return not getattr(element, 'hidden_after_read', False) and original(element)
+        def read_and_hide(element):
+            element.hidden_after_read = True
+            return element.saved_text
+        def set_text(element, value):
+            element.saved_text = value
+        # The normal numeric text read succeeds; the page then hides the chart.
+        for element in self.sre.driver.dom.elements:
+            element.saved_text = element.text
+        with patch.object(Element, 'is_displayed', displayed), patch.object(
+                Element, 'text', property(read_and_hide, set_text), create=True):
+            with self.assertRaises(GuardError):
+                self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(observer.events, [])
+        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(len(observer.events), 1)
+
+    def test_hidden_after_text_is_unknown_for_investigation_and_release(self):
+        issue, check = self.issue()
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1300))
+        original_load = self.bot._load
+        def hide_after_read(path):
+            original_load(path)
+            element = self.bot.driver.find_elements(None, '[data-chart-view]')[0]
+            element.is_displayed = Mock(side_effect=[True, False])
+        with patch.object(self.bot, '_load', hide_after_read):
+            result = investigate_chart(issue, check, self.bot, now=100)
+            tick = monitor.tick(100, self.bot)
+        self.assertEqual(result['conclusion']['state'], 'unknown')
+        self.assertIsNone(result['conclusion']['evidence'])
+        self.assertEqual(tick['state'], 'unknown')
+        self.assertIsNone(tick['evidence'])
+        self.assertTrue(tick['report'])
+        self.assertEqual(monitor.seen_evidence, set(check.observer_evidence))
+        self.now = 400
+        self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+        self.now, self.value = 700, 8
+        self.assertTrue(monitor.tick(700, self.bot)['report'])
+        self.now = 1000
+        self.assertFalse(monitor.tick(1000, self.bot)['report'])
+        self.assertIsNone(monitor.tick(1300, self.bot))
+        self.assertTrue(monitor.stopped)
+
     def test_filter_wire_shapes_are_not_silently_coerced(self):
         cases = [((), ''), ((), {}), ((('a', 'b'),), ['ab']),
                  ((('a', 'b'),), {'ab': 'ignored'}), ((('a', 'b'),), [{'a': 1, 'b': 2}])]
