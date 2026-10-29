@@ -249,6 +249,7 @@ class ReleaseMonitor:
             # Transport failures have no trusted evidence. Do not leak raw exception text.
             result = {'state': 'unknown', 'evidence': None, 'uncertainty': 'chart read failed'}
         result['duplicate'] = result['state'] == self.last_state
-        result['report'] = result['state'] in ('failure', 'unknown') and not result['duplicate']
+        result['recovery'] = result['state'] == 'healthy' and self.last_state in ('failure', 'unknown')
+        result['report'] = result['recovery'] or (result['state'] in ('failure', 'unknown') and not result['duplicate'])
         self.last_state = result['state']
         return result

@@ -183,7 +183,7 @@ class ChartJourneyTests(unittest.TestCase):
             states.append((result['state'], result['report'], result['duplicate']))
             self.assertIsNone(monitor.tick(now + 1, bot))
         self.assertEqual(states, [('healthy', False, False), ('failure', True, False),
-                                  ('failure', False, True), ('healthy', False, False), ('failure', True, False)])
+                                  ('failure', False, True), ('healthy', True, False), ('failure', True, False)])
         self.assertIsNone(monitor.tick(1600, bot))
         self.assertTrue(monitor.stopped)
         self.assertEqual(len(bot.reads), 5)
@@ -297,7 +297,7 @@ class ChartJourneyTests(unittest.TestCase):
                 result = monitor.tick(now, bot)
                 self.assertEqual(result['state'], expected)
                 self.assertEqual(result['evidence'], evidence)
-                self.assertEqual(result['report'], expected == 'unknown')
+                self.assertEqual(result['report'], expected == 'unknown' or now == 103)
         self.assertEqual(len(bot.reads), 5)
 
     def test_invalid_evidence_cannot_be_recycled_after_recovery(self):
@@ -350,6 +350,31 @@ class ChartJourneyTests(unittest.TestCase):
                 replace(self.check, observer_evidence=invalid)
         legacy = ChartCheck(self.binding, 1, 'observed-1', 'sre')
         self.assertEqual(ReleaseMonitor(ReleasePlan(legacy, 100, 1000)).seen_evidence, {'observed-1'})
+
+    def test_recovery_reports_once_after_failure_or_unknown_but_not_initial_health(self):
+        for bad in (replace(self.view, value=5), replace(self.view, state='loading'),
+                    RuntimeError('private transport detail')):
+            with self.subTest(bad=type(bad).__name__):
+                monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 110, cadence=1))
+                bot = FakeBrowser(replace(self.view, evidence_id='initial'))
+                initial = monitor.tick(100, bot)
+                self.assertFalse(initial['report'])
+                self.assertFalse(initial['recovery'])
+                bot.view = replace(bad, evidence_id='bad') if isinstance(bad, ChartView) else bad
+                self.assertTrue(monitor.tick(101, bot)['report'])
+                bot.view = replace(self.view, evidence_id='fresh', captured_at=102, sample_at=102)
+                recovered = monitor.tick(102, bot)
+                self.assertEqual(recovered['state'], 'healthy')
+                self.assertTrue(recovered['report'])
+                self.assertTrue(recovered['recovery'])
+                self.assertFalse(recovered['duplicate'])
+                bot.view = replace(self.view, evidence_id='still-healthy', captured_at=103, sample_at=103)
+                repeated = monitor.tick(103, bot)
+                self.assertFalse(repeated['report'])
+                self.assertFalse(repeated['recovery'])
+                self.assertTrue(repeated['duplicate'])
+                monitor.stop()
+                self.assertIsNone(monitor.tick(104, bot))
 
     def test_plan_bounds_and_schema_guards(self):
         for start, end, cadence in [(100, 100, 300), (100, 999999, 300), (-1, 100, 300),

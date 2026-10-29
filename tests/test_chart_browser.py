@@ -329,7 +329,7 @@ class ChartDOMTests(unittest.TestCase):
                 self.now = 400
                 result = monitor.tick(400, self.bot)
                 self.assertEqual(result['state'], 'healthy')
-                self.assertFalse(result['report'])
+                self.assertTrue(result['report'])
                 self.now = 100
 
     def test_http_dom_sample_newer_than_capture_is_not_trusted(self):
@@ -346,7 +346,7 @@ class ChartDOMTests(unittest.TestCase):
         self.changes, self.now = {}, 400
         result = monitor.tick(400, self.bot)
         self.assertEqual(result['state'], 'healthy')
-        self.assertFalse(result['report'])
+        self.assertTrue(result['report'])
 
     def test_http_dom_replayed_earlier_observer_evidence_is_unknown(self):
         self.sre.read_chart('entity-chart', self.binding)
