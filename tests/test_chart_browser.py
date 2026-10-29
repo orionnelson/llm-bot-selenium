@@ -50,6 +50,55 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_numeric_text_changed_during_collection_is_not_observed(self):
+        original_get = Element.get_attribute
+        for initial, changed in ((0, '8'), (8, '0'), (0, '')):
+            with self.subTest(initial=initial, changed=changed):
+                self.value = initial
+                self.sre.read_chart('dashboard', self.binding)
+                observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+                def mutate_on_recheck(element, name):
+                    element.payload_reads = getattr(element, 'payload_reads', 0) + (name == 'data-chart-view')
+                    if name == 'data-chart-view' and element.payload_reads == 2:
+                        element.text = changed
+                    return original_get(element, name)
+                with patch.object(Element, 'get_attribute', mutate_on_recheck):
+                    with self.assertRaises(GuardError):
+                        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(observer.events, [])
+                self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(len(observer.events), 1)
+
+    def test_changed_numeric_text_is_unknown_then_release_recovers(self):
+        issue, check = self.issue()
+        original_get = Element.get_attribute
+        for initial, changed in ((0, '8'), (8, '0'), (0, '')):
+            with self.subTest(initial=initial, changed=changed):
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1300))
+                self.now, self.value = 100, initial
+                def mutate_on_recheck(element, name):
+                    element.payload_reads = getattr(element, 'payload_reads', 0) + (name == 'data-chart-view')
+                    if name == 'data-chart-view' and element.payload_reads == 2:
+                        element.text = changed
+                    return original_get(element, name)
+                with patch.object(Element, 'get_attribute', mutate_on_recheck):
+                    result = investigate_chart(issue, check, self.bot, now=100)
+                    tick = monitor.tick(100, self.bot)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIsNone(result['conclusion']['evidence'])
+                self.assertEqual(tick['state'], 'unknown')
+                self.assertIsNone(tick['evidence'])
+                self.assertTrue(tick['report'])
+                self.assertEqual(monitor.seen_evidence, set(check.observer_evidence))
+                self.now, self.value = 400, 0
+                self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+                self.now, self.value = 700, 8
+                self.assertTrue(monitor.tick(700, self.bot)['report'])
+                self.now = 1000
+                self.assertFalse(monitor.tick(1000, self.bot)['report'])
+                self.assertIsNone(monitor.tick(1300, self.bot))
+                self.assertTrue(monitor.stopped)
+
     def test_chart_payload_changed_during_text_collection_is_not_observed(self):
         self.sre.read_chart('dashboard', self.binding)
         original_get = Element.get_attribute
