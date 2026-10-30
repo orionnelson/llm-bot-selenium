@@ -145,10 +145,14 @@ class ChartCheck:
 
     @classmethod
     def from_issue(cls, issue, maximum, *, sre_validated=False, now):
-        if sre_validated is not True or not issue.events:
+        if sre_validated is not True or not 1 <= len(issue.events) <= 100:
             raise GuardError('explicit SRE validation and observed chart required')
         if type(maximum) not in (int, float) or not math.isfinite(maximum) or maximum < 0:
             raise GuardError('explicit finite nonnegative maximum required')
+        # Dataclass construction is not proof that recorder guards ran.
+        checked = SyntheticObserver(issue.observer_session, [e.view.binding for e in issue.events], consent=True)
+        for event in issue.events:
+            checked.record(event.action, event.route, event.view)
         view = issue.events[-1].view
         view.verify(view.binding, now)
         return cls(view.binding, maximum, view.evidence_id, issue.observer_session,

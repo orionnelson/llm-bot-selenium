@@ -1,0 +1,119 @@
+{
+  "source_base": "f4328d2239836b117cda93a0b1b65090e296ecbe",
+  "chart_checks_sha256": "87c4fe6edde8913ca67c487b3a2939aba38531a03329c37a526a01d74530b4ae",
+  "transport": "actual loopback HTTP and Selenium waits, fake DOM, no rendered browser/model",
+  "forged_issue_conversion_rejected": true,
+  "conflict_rejected": true,
+  "repeated_identical_evidence_preserved": true,
+  "observer_actions": [
+    "navigate",
+    "shortcut-open-chart",
+    "shortcut-open-chart"
+  ],
+  "investigation": {
+    "observed": {
+      "state": "failure",
+      "evidence": "observed-last",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause"
+    },
+    "conclusion": {
+      "state": "failure",
+      "evidence": "investigation",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause"
+    },
+    "route": "entity-chart"
+  },
+  "release_results": [
+    {
+      "at": 100,
+      "state": "healthy",
+      "evidence": "fresh-100",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": false,
+      "report": false
+    },
+    {
+      "at": 400,
+      "state": "failure",
+      "evidence": "fresh-400",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 700,
+      "state": "failure",
+      "evidence": "fresh-700",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": true,
+      "recovery": false,
+      "report": false
+    },
+    {
+      "at": 1000,
+      "state": "healthy",
+      "evidence": "fresh-1000",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": true,
+      "report": true
+    },
+    {
+      "at": 1300,
+      "state": "healthy",
+      "evidence": "fresh-1300",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": true,
+      "recovery": false,
+      "report": false
+    },
+    {
+      "at": 1600,
+      "state": "unknown",
+      "evidence": "fresh-1600",
+      "uncertainty": "chart loading or missing",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 1900,
+      "state": "healthy",
+      "evidence": "fresh-1900",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": true,
+      "report": true
+    },
+    {
+      "at": 2200,
+      "state": "healthy",
+      "evidence": "fresh-2200",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": true,
+      "recovery": false,
+      "report": false
+    }
+  ],
+  "stopped_at_end": true
+}
