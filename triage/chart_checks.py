@@ -115,6 +115,8 @@ class SyntheticObserver:
             raise GuardError('invalid chart state')
         if view.value is not None and (type(view.value) not in (int, float) or not math.isfinite(view.value)):
             raise GuardError('typed numeric chart value required')
+        if any(event.view.evidence_id == view.evidence_id and event.view != view for event in self.events):
+            raise GuardError('conflicting observer evidence reference')
         self.events.append(IssueEvent(action, route, view))
 
     def stop(self):
