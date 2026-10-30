@@ -45,6 +45,25 @@ class ChartJourneyTests(unittest.TestCase):
         self.assertEqual(bot.reads, [('entity-chart', self.binding)])
         self.assertEqual(len(self.issue.events), 2)  # bot never drives observer
 
+    def test_check_conversion_revalidates_entire_issue_not_only_last_chart(self):
+        first, last = self.issue.events
+        invalid = {
+            'conflicting-evidence': (replace(first, view=replace(first.view, value=8)), last),
+            'arbitrary-action': (replace(first, action='type-password'), last),
+            'unknown-route': (replace(first, route='private-page'), last),
+            'unordered-time': (replace(first, view=replace(first.view, evidence_id='older', captured_at=101)), last),
+            'untyped-session': (replace(first, view=replace(first.view, evidence_id='older', session_valid=1)), last),
+            'oversized-history': (first,) * 101,
+        }
+        for name, events in invalid.items():
+            with self.subTest(name=name), self.assertRaises(GuardError):
+                ChartCheck.from_issue(replace(self.issue, events=events), 1,
+                                      sre_validated=True, now=100)
+        # Legitimate repeats still create the same reusable check.
+        check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
+        self.assertEqual(check, self.check)
+        self.assertEqual(check.observer_evidence, ('observed-1', 'observed-1'))
+
     def test_observer_rejects_conflicting_evidence_references_without_losing_history(self):
         for change in ({'value': 8}, {'captured_at': 101, 'sample_at': 101},
                        {'state': 'loading', 'value': None}, {'session_valid': False},
