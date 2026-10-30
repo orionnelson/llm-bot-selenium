@@ -17,7 +17,7 @@ class StudioSessionTests(unittest.TestCase):
         self.view = ChartView(self.binding, 'evidence-1', 100, 100, 0)
         observer = SyntheticObserver(self.port.session, [self.binding], consent=True)
         observer.record('navigate', 'dashboard', self.view)
-        observer.record('shortcut-open-chart', 'entity-chart', replace(self.view, captured_at=102))
+        observer.record('shortcut-open-chart', 'entity-chart', replace(self.view, evidence_id='evidence-2', captured_at=102))
         self.issue = observer.stop()
         self.driver.reset_mock()
 
@@ -49,6 +49,7 @@ class StudioSessionTests(unittest.TestCase):
         first, last = self.issue.events
         for event in [replace(last, route='https://private.example/?token=secret'),
                       replace(last, action='keypress'),
+                      replace(last, view=replace(first.view, value=8)),
                       replace(last, view=replace(last.view, captured_at=99)),
                       replace(last, view=replace(last.view, captured_at=True)),
                       replace(last, view=replace(last.view, captured_at=86501))]:

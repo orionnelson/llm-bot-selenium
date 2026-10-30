@@ -45,6 +45,23 @@ class ChartJourneyTests(unittest.TestCase):
         self.assertEqual(bot.reads, [('entity-chart', self.binding)])
         self.assertEqual(len(self.issue.events), 2)  # bot never drives observer
 
+    def test_observer_rejects_conflicting_evidence_references_without_losing_history(self):
+        for change in ({'value': 8}, {'captured_at': 101, 'sample_at': 101},
+                       {'state': 'loading', 'value': None}, {'session_valid': False},
+                       {'ui_version': 'chart-v2'}):
+            with self.subTest(change=change):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                observer.record('navigate', 'dashboard', self.view)
+                with self.assertRaises(GuardError):
+                    observer.record('shortcut-open-chart', 'entity-chart', replace(self.view, **change))
+                self.assertEqual(len(observer.events), 1)
+                # Re-observing the same immutable facts is legitimate; new facts need a fresh ID.
+                observer.record('shortcut-open-chart', 'dashboard', self.view)
+                fresh = replace(self.view, evidence_id='observed-2', **change)
+                observer.record('navigate', 'entity-chart', fresh)
+                self.assertEqual([e.view.evidence_id for e in observer.stop().events],
+                                 ['observed-1', 'observed-1', 'observed-2'])
+
     def test_explicit_consent_scope_and_stop(self):
         with self.assertRaises(GuardError):
             SyntheticObserver('sre', [self.binding])

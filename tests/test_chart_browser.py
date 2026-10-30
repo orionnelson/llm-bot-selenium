@@ -50,6 +50,34 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_http_conflicting_observer_evidence_cannot_replace_validated_chart(self):
+        self.changes = {'evidence_id': 'same-observed-id'}
+        self.sre.read_chart('dashboard', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.value = 8
+        self.sre.read_chart('entity-chart', self.binding)
+        with self.assertRaises(GuardError):
+            self.sre.capture(observer, 'shortcut-open-chart', 'entity-chart', self.binding)
+        self.assertEqual(len(observer.events), 1)
+        self.changes = {'evidence_id': 'fresh-observed-id'}
+        self.sre.read_chart('entity-chart', self.binding)
+        self.sre.capture(observer, 'shortcut-open-chart', 'entity-chart', self.binding)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        self.assertEqual(check.observer_evidence, ('same-observed-id', 'fresh-observed-id'))
+        self.changes = {'evidence_id': 'independent-id'}
+        result = investigate_chart(issue, check, self.bot, now=100)
+        self.assertEqual(result['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.changes = {'evidence_id': 'release-failure'}
+        self.assertEqual(monitor.tick(100, self.bot)['state'], 'failure')
+        self.now, self.value = 400, 0
+        self.changes = {'evidence_id': 'release-recovery'}
+        result = monitor.tick(400, self.bot)
+        self.assertTrue(result['recovery'] and result['report'])
+        self.assertIsNone(monitor.tick(1000, self.bot))
+
     def test_numeric_text_changed_during_collection_is_not_observed(self):
         original_get = Element.get_attribute
         for initial, changed in ((0, '8'), (8, '0'), (0, '')):
