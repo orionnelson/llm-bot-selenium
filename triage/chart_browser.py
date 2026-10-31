@@ -40,6 +40,7 @@ class SeleniumChartPort(SeleniumPort):
 
     def read_visible(self, binding, route):
         binding.check()
+        session = self.session
         self._origin_check()
         url = self.driver.current_url
         if route not in ('dashboard', 'entity-chart') or urlsplit(url).path != '/chart/' + route:
@@ -65,6 +66,8 @@ class SeleniumChartPort(SeleniumPort):
             data = json.loads(payload, object_pairs_hook=_unique_fields)
             if type(data) is not dict:
                 raise ValueError('chart object required')
+            if self.session != session:
+                raise GuardError('browser session changed during chart read')
             actual = binding_from_data(data.pop('binding'))
             view = ChartView(binding=actual, value=json.loads(text) if text else None, **data)
             if actual != binding:
@@ -77,7 +80,10 @@ class SeleniumChartPort(SeleniumPort):
         binding.check()
         if route not in ('dashboard', 'entity-chart'):
             raise GuardError('chart route not allowlisted')
+        session = self.session
         self._load('/chart/' + route + '?' + urlencode({'binding': json.dumps(asdict(binding))}))
+        if self.session != session:
+            raise GuardError('browser session changed during chart navigation')
         return self.read_visible(binding, route)
 
     def capture(self, observer, action, route, binding):

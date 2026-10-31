@@ -50,6 +50,63 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_session_change_during_capture_rejected_without_appending(self):
+        self.sre.read_chart('dashboard', self.binding)
+        original_get = Element.get_attribute
+        session = self.sre.session
+        for changed in ('replacement-driver', None):
+            with self.subTest(changed=changed):
+                self.sre.driver.session_id = session
+                observer = SyntheticObserver(session, [self.binding], consent=True)
+                def switch(element, name):
+                    if name == 'data-chart-view':
+                        element.driver.session_id = changed
+                    return original_get(element, name)
+                with patch.object(Element, 'get_attribute', switch):
+                    with self.assertRaises(GuardError):
+                        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(observer.events, [])
+                self.sre.driver.session_id = session
+                self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(len(observer.events), 1)
+
+    def test_session_change_during_navigation_or_read_is_unknown_then_recovers(self):
+        issue, check = self.issue()
+        session = self.bot.session
+        original_load, original_get = self.bot.driver.get, Element.get_attribute
+        for stage in ('navigation', 'payload'):
+            for value in (0, 8):
+                with self.subTest(stage=stage, value=value):
+                    self.bot.driver.session_id = session
+                    self.now, self.value = 100, value
+                    monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                    def switch_navigation(url):
+                        original_load(url)
+                        self.bot.driver.session_id = self.sre.session
+                    def switch_payload(element, name):
+                        if element.driver is self.bot.driver and name == 'data-chart-view':
+                            element.driver.session_id = self.sre.session
+                        return original_get(element, name)
+                    target, attribute, replacement = ((self.bot.driver, 'get', switch_navigation)
+                        if stage == 'navigation' else (Element, 'get_attribute', switch_payload))
+                    with patch.object(target, attribute, replacement):
+                        result = investigate_chart(issue, check, self.bot, now=100)
+                        self.assertEqual(result['conclusion']['state'], 'unknown')
+                        self.assertIsNone(result['conclusion']['evidence'])
+                        self.bot.driver.session_id = session
+                        result = monitor.tick(100, self.bot)
+                        self.assertEqual(result['state'], 'unknown')
+                        self.assertIsNone(result['evidence'])
+                        self.assertTrue(result['report'])
+                        self.assertEqual(monitor.seen_evidence,
+                                         {check.source_evidence, *check.observer_evidence})
+                    self.bot.driver.session_id = session
+                    self.now, self.value = 400, 0
+                    result = monitor.tick(400, self.bot)
+                    self.assertEqual(result['state'], 'healthy')
+                    self.assertTrue(result['recovery'] and result['report'])
+                    self.assertIsNone(monitor.tick(1000, self.bot))
+
     def test_http_conflicting_observer_evidence_cannot_replace_validated_chart(self):
         self.changes = {'evidence_id': 'same-observed-id'}
         self.sre.read_chart('dashboard', self.binding)
