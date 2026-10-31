@@ -188,7 +188,7 @@ def investigate_chart(issue, check, bot, *, now):
     except Exception:
         return {'observed': interpretation, 'route': route,
                 'conclusion': {'state': 'unknown', 'evidence': None, 'uncertainty': 'chart read failed'}}
-    if any(fresh.evidence_id == event.view.evidence_id for event in issue.events):
+    if fresh.evidence_id in check.observer_evidence or any(fresh.evidence_id == event.view.evidence_id for event in issue.events):
         conclusion = {'state': 'unknown', 'evidence': fresh.evidence_id, 'uncertainty': 'reused observer evidence'}
     return {'observed': interpretation, 'conclusion': conclusion, 'route': route}
 
