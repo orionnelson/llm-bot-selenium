@@ -433,6 +433,43 @@ class ChartDOMTests(unittest.TestCase):
         self.assertEqual(result['state'], 'healthy')
         self.assertTrue(result['report'])
 
+    def test_http_dom_truncated_issue_cannot_erase_validated_check_provenance(self):
+        self.sre.read_chart('entity-chart', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        self.sre.capture(observer, 'navigate', 'entity-chart', self.binding)
+        earlier = observer.events[-1].view.evidence_id
+        self.sre.read_chart('dashboard', self.binding)
+        self.sre.capture(observer, 'shortcut-open-chart', 'dashboard', self.binding)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        issue = replace(issue, events=issue.events[-1:])
+        self.assertNotEqual(earlier, check.source_evidence)
+        original_url = self.sre.driver.current_url
+        self.changes = {'evidence_id': earlier}
+        for value in (0, 8):
+            with self.subTest(value=value):
+                self.value = value
+                result = investigate_chart(issue, check, self.bot, now=100)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertEqual(result['conclusion']['evidence'], earlier)
+                self.assertEqual(self.sre.driver.current_url, original_url)
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                release = monitor.tick(100, self.bot)
+                self.assertEqual(release['state'], 'unknown')
+                self.assertEqual(release['evidence'], earlier)
+                self.assertTrue(release['report'])
+                self.assertEqual(monitor.seen_evidence, {earlier, check.source_evidence})
+        self.changes = {}
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertEqual(monitor.tick(100, self.bot)['state'], 'failure')
+        self.assertTrue(monitor.tick(400, self.bot)['duplicate'])
+        self.value, self.now = 0, 700
+        self.assertEqual(monitor.tick(700, self.bot)['state'], 'healthy')
+        reads = len(self.routes)
+        self.assertIsNone(monitor.tick(1000, self.bot))
+        self.assertEqual(len(self.routes), reads)
+
     def test_http_dom_replayed_earlier_observer_evidence_is_unknown(self):
         self.sre.read_chart('entity-chart', self.binding)
         observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
