@@ -480,3 +480,46 @@ class ChartJourneyTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class SessionBoundaryTests(unittest.TestCase):
+    setUp = ChartJourneyTests.setUp
+    def test_independent_adapter_session_change_is_unknown(self):
+        for session in ('sre', 'other-bot', None):
+            for value in (0, 8):
+                with self.subTest(session=session, value=value):
+                    bot = FakeBrowser(replace(self.view, evidence_id='fresh-bot', value=value))
+                    read = bot.read_chart
+                    def switched(route, binding):
+                        view = read(route, binding)
+                        bot.session = session
+                        return view
+                    bot.read_chart = switched
+                    result = investigate_chart(self.issue, self.check, bot, now=100)
+                    self.assertEqual(result['conclusion']['state'], 'unknown')
+                    self.assertIsNone(result['conclusion']['evidence'])
+                    self.assertEqual(len(self.issue.events), 2)
+
+    def test_release_adapter_session_change_does_not_commit_evidence(self):
+        for session in ('sre', 'other-bot', None):
+            with self.subTest(session=session):
+                monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 1000))
+                bot = FakeBrowser(replace(self.view, evidence_id='fresh-release', value=8))
+                read = bot.read_chart
+                def switched(route, binding):
+                    view = read(route, binding)
+                    bot.session = session
+                    return view
+                bot.read_chart = switched
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertIsNone(result['evidence'])
+                self.assertNotIn('fresh-release', monitor.seen_evidence)
+                self.assertEqual(monitor.last_capture, 100)
+                bot.session = 'bot'
+                bot.read_chart = read
+                bot.view = replace(self.view, evidence_id='recovered', captured_at=400, sample_at=400)
+                recovered = monitor.tick(400, bot)
+                self.assertEqual(recovered['state'], 'healthy')
+                self.assertTrue(recovered['recovery'])
+                self.assertTrue(recovered['report'])
+                self.assertIsNone(monitor.tick(1000, bot))
