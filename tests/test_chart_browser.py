@@ -50,6 +50,29 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_capture_rollback_over_http_is_unknown_and_fresh_read_recovers(self):
+        issue, check = self.issue()
+        self.now = 99
+        for value in (0, 8):
+            with self.subTest(value=value):
+                self.value = value
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 110, cadence=1))
+                result = investigate_chart(issue, check, self.bot, now=100)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                result = monitor.tick(100, self.bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertTrue(result['report'])
+        self.now, self.value = 101, 8
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=101)['conclusion']['state'], 'failure')
+        self.assertEqual(monitor.tick(101, self.bot)['state'], 'failure')
+        self.now, self.value = 100, 0
+        self.assertEqual(monitor.tick(102, self.bot)['state'], 'unknown')
+        self.now = 103
+        recovered = monitor.tick(103, self.bot)
+        self.assertEqual(recovered['state'], 'healthy')
+        self.assertTrue(recovered['recovery'])
+        self.assertEqual(len(issue.events), 2)
+
     def test_session_change_during_capture_rejected_without_appending(self):
         self.sre.read_chart('dashboard', self.binding)
         original_get = Element.get_attribute
@@ -449,6 +472,7 @@ class ChartDOMTests(unittest.TestCase):
         for value in (0, 8):
             with self.subTest(value=value):
                 self.value = value
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 110, cadence=1))
                 result = investigate_chart(issue, check, self.bot, now=100)
                 self.assertEqual(result['conclusion']['state'], 'unknown')
                 self.assertEqual(result['conclusion']['evidence'], earlier)
@@ -485,6 +509,7 @@ class ChartDOMTests(unittest.TestCase):
         for value in (0, 8):
             with self.subTest(value=value):
                 self.value = value
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 110, cadence=1))
                 result = investigate_chart(issue, check, self.bot, now=100)
                 self.assertEqual(result['conclusion']['state'], 'unknown')
                 self.assertEqual(result['conclusion']['evidence'], earlier)

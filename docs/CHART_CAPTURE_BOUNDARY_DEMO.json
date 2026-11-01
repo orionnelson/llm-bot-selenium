@@ -1,0 +1,158 @@
+{
+  "source_base": "866424466d4602a9a07bb3d7e7842d88aec12171",
+  "chart_checks_sha256": "efd67333265fe37132cb8fa2bae34f03fe8abf87a23072b24632d06f9c1344aa",
+  "transport": "actual loopback HTTP and Selenium waits, fake DOM; not rendered browser/model/video",
+  "observer_actions": [
+    "navigate",
+    "shortcut-open-chart"
+  ],
+  "older_independent_capture": {
+    "observed": {
+      "state": "healthy",
+      "evidence": "observed-last",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause"
+    },
+    "conclusion": {
+      "state": "unknown",
+      "evidence": "old-capture-new-id",
+      "uncertainty": "capture predates the required observation boundary"
+    },
+    "route": "entity-chart"
+  },
+  "fresh_independent_investigation": {
+    "observed": {
+      "state": "healthy",
+      "evidence": "observed-last",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause"
+    },
+    "conclusion": {
+      "state": "failure",
+      "evidence": "fresh-independent",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause"
+    },
+    "route": "entity-chart"
+  },
+  "observer_unchanged": true,
+  "same_check_release_results": [
+    {
+      "at": 100,
+      "captured_at": 99,
+      "state": "unknown",
+      "evidence": "tick-100",
+      "uncertainty": "capture predates the required observation boundary",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 101,
+      "captured_at": 101,
+      "state": "healthy",
+      "evidence": "tick-101",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": true,
+      "report": true
+    },
+    {
+      "at": 102,
+      "captured_at": 102,
+      "state": "failure",
+      "evidence": "tick-102",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 103,
+      "captured_at": 101,
+      "state": "unknown",
+      "evidence": "tick-103",
+      "uncertainty": "capture predates the required observation boundary",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 104,
+      "captured_at": 105,
+      "state": "unknown",
+      "evidence": "tick-104",
+      "uncertainty": "stale, future or missing observation timestamp",
+      "duplicate": true,
+      "recovery": false,
+      "report": false
+    },
+    {
+      "at": 105,
+      "captured_at": 102,
+      "state": "healthy",
+      "evidence": "tick-105",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": true,
+      "report": true
+    },
+    {
+      "at": 106,
+      "captured_at": 106,
+      "state": "failure",
+      "evidence": "tick-106",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 107,
+      "captured_at": 107,
+      "state": "failure",
+      "evidence": "tick-107",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": true,
+      "recovery": false,
+      "report": false
+    },
+    {
+      "at": 108,
+      "captured_at": 108,
+      "state": "unknown",
+      "evidence": "tick-108",
+      "uncertainty": "chart loading or missing",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 109,
+      "captured_at": 109,
+      "state": "healthy",
+      "evidence": "tick-109",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": true,
+      "report": true
+    }
+  ],
+  "release_cadence": 1,
+  "stopped_at_end": true
+}
