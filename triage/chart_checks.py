@@ -158,9 +158,11 @@ class ChartCheck:
         return cls(view.binding, maximum, view.evidence_id, issue.observer_session,
                    tuple(event.view.evidence_id for event in issue.events))
 
-    def evaluate(self, view, now):
+    def evaluate(self, view, now, *, captured_since=0):
         try:
             view.verify(self.binding, now)
+            if view.captured_at < captured_since:
+                raise GuardError('capture predates the required observation boundary')
         except GuardError as exc:
             return {'state': 'unknown', 'evidence': view.evidence_id, 'uncertainty': str(exc)}
         return {'state': 'healthy' if view.value <= self.maximum else 'failure',
@@ -184,7 +186,7 @@ def investigate_chart(issue, check, bot, *, now):
     route = 'entity-chart' if observed.route == 'dashboard' else 'dashboard'
     try:
         fresh = bot.read_chart(route, check.binding)
-        conclusion = check.evaluate(fresh, now)
+        conclusion = check.evaluate(fresh, now, captured_since=observed.view.captured_at)
     except Exception:
         return {'observed': interpretation, 'route': route,
                 'conclusion': {'state': 'unknown', 'evidence': None, 'uncertainty': 'chart read failed'}}
@@ -219,6 +221,7 @@ class ReleaseMonitor:
         self.stopped = False
         self.last_state = None
         self.last_tick = -1
+        self.last_capture = plan.start
         # At most one read per cadence slot in the <=24h release window.
         self.seen_evidence = {plan.check.source_evidence, *plan.check.observer_evidence}
 
@@ -243,9 +246,11 @@ class ReleaseMonitor:
             if self.stopped:
                 return None
             identifier(view.evidence_id)
-            result = self.plan.check.evaluate(view, now)
+            result = self.plan.check.evaluate(view, now, captured_since=self.last_capture)
             if view.evidence_id in self.seen_evidence:
                 result = {'state': 'unknown', 'evidence': view.evidence_id, 'uncertainty': 'reused evidence within this release'}
+            if result['state'] != 'unknown':
+                self.last_capture = view.captured_at
             self.seen_evidence.add(view.evidence_id)
             if not view.session_valid:
                 self.stop()

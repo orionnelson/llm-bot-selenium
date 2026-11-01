@@ -160,6 +160,40 @@ class ChartJourneyTests(unittest.TestCase):
                     self.assertEqual(result['conclusion']['state'], expected)
                 self.assertEqual(self.monitor().tick(captured, FakeBrowser(view))['state'], expected)
 
+    def test_new_ids_cannot_hide_capture_rollback_in_either_journey(self):
+        for value in (0, 7):
+            with self.subTest(value=value):
+                older = replace(self.view, evidence_id='older-new-id', captured_at=99,
+                                sample_at=99, value=value)
+                result = investigate_chart(self.issue, self.check, FakeBrowser(older), now=100)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIn('capture predates', result['conclusion']['uncertainty'])
+                monitor = self.monitor()
+                result = monitor.tick(100, FakeBrowser(older))
+                self.assertEqual(result['state'], 'unknown')
+                self.assertTrue(result['report'])
+
+    def test_release_capture_watermark_rejects_rollback_and_recovers(self):
+        monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 110, cadence=1))
+        def tick(now, captured, value=0, **changes):
+            view = replace(self.view, evidence_id='read-' + str(now), captured_at=captured,
+                           sample_at=min(100, captured), value=value, **changes)
+            return monitor.tick(now, FakeBrowser(view))
+        self.assertEqual(tick(100, 100)['state'], 'healthy')
+        self.assertEqual(tick(101, 101, 7)['state'], 'failure')
+        rolled_back = tick(102, 100)
+        self.assertEqual(rolled_back['state'], 'unknown')
+        self.assertTrue(rolled_back['report'])
+        self.assertFalse(rolled_back['recovery'])
+        # Invalid future capture must not poison the last validated watermark.
+        self.assertEqual(tick(103, 104)['state'], 'unknown')
+        recovered = tick(104, 101)
+        self.assertEqual(recovered['state'], 'healthy')
+        self.assertTrue(recovered['recovery'])
+        # Equal-second captures and unchanged chart samples remain legitimate.
+        self.assertEqual(tick(105, 101, 7)['state'], 'failure')
+        self.assertIsNone(monitor.tick(110, FakeBrowser(self.view)))
+
     def test_validation_requires_rule_and_valid_current_observation(self):
         with self.assertRaises(GuardError):
             ChartCheck.from_issue(self.issue, 1, now=100)
