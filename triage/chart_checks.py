@@ -174,7 +174,8 @@ def investigate_chart(issue, check, bot, *, now):
     """Deterministic synthetic baseline, NOT model-led page understanding."""
     if not issue.events or issue.observer_session != check.observer_session:
         raise GuardError('check/issue provenance mismatch')
-    if bot.session == issue.observer_session:
+    session = bot.session
+    if session == issue.observer_session:
         raise GuardError('investigation requires a separate browser session')
     observed = issue.events[-1]
     if observed.view.evidence_id != check.source_evidence or observed.view.binding != check.binding:
@@ -186,6 +187,8 @@ def investigate_chart(issue, check, bot, *, now):
     route = 'entity-chart' if observed.route == 'dashboard' else 'dashboard'
     try:
         fresh = bot.read_chart(route, check.binding)
+        if bot.session != session:
+            raise GuardError('investigation session changed during chart read')
         conclusion = check.evaluate(fresh, now, captured_since=observed.view.captured_at)
     except Exception:
         return {'observed': interpretation, 'route': route,
@@ -237,7 +240,8 @@ class ReleaseMonitor:
             return None
         if now < self.next_due:
             return None
-        if bot.session == self.plan.check.observer_session:
+        session = bot.session
+        if session == self.plan.check.observer_session:
             raise GuardError('monitor requires a separate browser session')
         # Skip missed slots rather than burst/replay; always collect current evidence.
         self.next_due = self.plan.start + ((now - self.plan.start) // self.plan.cadence + 1) * self.plan.cadence
@@ -245,6 +249,8 @@ class ReleaseMonitor:
             view = bot.read_chart('entity-chart', self.plan.check.binding)
             if self.stopped:
                 return None
+            if bot.session != session:
+                raise GuardError('monitor session changed during chart read')
             identifier(view.evidence_id)
             result = self.plan.check.evaluate(view, now, captured_since=self.last_capture)
             if view.evidence_id in self.seen_evidence:
