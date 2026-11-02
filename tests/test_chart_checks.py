@@ -483,6 +483,42 @@ if __name__ == '__main__':
 
 class SessionBoundaryTests(unittest.TestCase):
     setUp = ChartJourneyTests.setUp
+    def test_independent_requires_valid_session_before_read(self):
+        fixture = ChartJourneyTests()
+        fixture.setUp()
+        for session in (None, '', 7, 'x' * 81, 'raw/session'):
+            for value in (0, 8):
+                with self.subTest(session=session, value=value):
+                    bot = FakeBrowser(replace(fixture.view, evidence_id='fresh', value=value))
+                    bot.session = session
+                    with self.assertRaises(GuardError):
+                        investigate_chart(fixture.issue, fixture.check, bot, now=100)
+                    self.assertEqual(bot.reads, [])
+
+    def test_release_requires_valid_session_without_consuming_due_slot(self):
+        fixture = ChartJourneyTests()
+        fixture.setUp()
+        for session in (None, '', 7, 'x' * 81, 'raw/session'):
+            with self.subTest(session=session):
+                bot = FakeBrowser(replace(fixture.view, evidence_id='fresh'))
+                bot.session = session
+                monitor = ReleaseMonitor(ReleasePlan(fixture.check, 100, 1000))
+                self.assertIsNone(monitor.tick(99, bot))  # not due: no identity/read needed
+                before = (monitor.next_due, monitor.last_capture, set(monitor.seen_evidence), monitor.last_state)
+                with self.assertRaises(GuardError):
+                    monitor.tick(100, bot)
+                self.assertEqual(bot.reads, [])
+                self.assertEqual((monitor.next_due, monitor.last_capture, monitor.seen_evidence, monitor.last_state), before)
+                bot.session = 'bot'
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'healthy')
+                self.assertFalse(result['report'])
+                monitor.stop()
+                bot.session = None
+                self.assertIsNone(monitor.tick(400, bot))
+                ended = ReleaseMonitor(ReleasePlan(fixture.check, 100, 1000))
+                self.assertIsNone(ended.tick(1000, bot))
+
     def test_independent_adapter_session_change_is_unknown(self):
         for session in ('sre', 'other-bot', None):
             for value in (0, 8):
