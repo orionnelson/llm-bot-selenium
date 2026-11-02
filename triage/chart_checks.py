@@ -175,6 +175,7 @@ def investigate_chart(issue, check, bot, *, now):
     if not issue.events or issue.observer_session != check.observer_session:
         raise GuardError('check/issue provenance mismatch')
     session = bot.session
+    identifier(session)
     if session == issue.observer_session:
         raise GuardError('investigation requires a separate browser session')
     observed = issue.events[-1]
@@ -241,6 +242,7 @@ class ReleaseMonitor:
         if now < self.next_due:
             return None
         session = bot.session
+        identifier(session)
         if session == self.plan.check.observer_session:
             raise GuardError('monitor requires a separate browser session')
         # Skip missed slots rather than burst/replay; always collect current evidence.
