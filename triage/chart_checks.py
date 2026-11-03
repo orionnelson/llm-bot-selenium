@@ -159,6 +159,8 @@ class ChartCheck:
                    tuple(event.view.evidence_id for event in issue.events))
 
     def evaluate(self, view, now, *, captured_since=0):
+        if not isinstance(view.evidence_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', view.evidence_id):
+            return {'state': 'unknown', 'evidence': None, 'uncertainty': 'invalid evidence reference'}
         try:
             view.verify(self.binding, now)
             if view.captured_at < captured_since:
