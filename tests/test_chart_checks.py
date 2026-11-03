@@ -559,3 +559,44 @@ class SessionBoundaryTests(unittest.TestCase):
                 self.assertTrue(recovered['recovery'])
                 self.assertTrue(recovered['report'])
                 self.assertIsNone(monitor.tick(1000, bot))
+
+class EvidenceReferenceTests(unittest.TestCase):
+    setUp = ChartJourneyTests.setUp
+
+    def test_invalid_reference_returns_unknown_without_echo_or_exception(self):
+        for evidence in ('https://synthetic.invalid/?token=fixture-secret', '', 'x' * 101,
+                         None, 7, True, ['fixture-secret'], {'secret': 'fixture-secret'}):
+            for state in ('ready', 'loading'):
+                with self.subTest(evidence=type(evidence).__name__, state=state):
+                    view = replace(self.view, evidence_id=evidence, state=state)
+                    result = self.check.evaluate(view, 100)
+                    self.assertEqual(result['state'], 'unknown')
+                    self.assertIsNone(result['evidence'])
+                    self.assertNotIn('fixture-secret', str(result))
+                    bot = FakeBrowser(view)
+                    independent = investigate_chart(self.issue, self.check, bot, now=100)
+                    self.assertEqual(independent['conclusion']['state'], 'unknown')
+                    self.assertIsNone(independent['conclusion']['evidence'])
+                    self.assertEqual(len(bot.reads), 1)
+
+    def test_same_check_release_rejects_bad_reference_then_recovers(self):
+        for evidence in ('raw fixture-secret!', None, ['fixture-secret']):
+            with self.subTest(evidence=type(evidence).__name__):
+                monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 1000))
+                bot = FakeBrowser(replace(self.view, evidence_id=evidence))
+                rejected = monitor.tick(100, bot)
+                self.assertEqual(rejected['state'], 'unknown')
+                self.assertIsNone(rejected['evidence'])
+                self.assertEqual(monitor.seen_evidence, set(self.check.observer_evidence))
+                bot.view = replace(self.view, evidence_id='fresh-recovery', captured_at=400, sample_at=400)
+                recovered = monitor.tick(400, bot)
+                self.assertTrue(recovered['recovery'] and recovered['report'])
+                self.assertEqual(recovered['state'], 'healthy')
+                self.assertIsNone(monitor.tick(1000, bot))
+
+    def test_valid_unknown_reference_remains_available(self):
+        # Policy permits 100-character evidence IDs; do not narrow this contract to 80.
+        for evidence in ('grounded-reference', 'x' * 100):
+            result = self.check.evaluate(replace(self.view, evidence_id=evidence, state='loading'), 100)
+            self.assertEqual(result['state'], 'unknown')
+            self.assertEqual(result['evidence'], evidence)
