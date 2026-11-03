@@ -34,6 +34,39 @@ class ChartJourneyTests(unittest.TestCase):
         self.issue = self.observer.stop()
         self.check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
 
+    def test_evaluation_clock_rejects_coercion_and_invalid_values(self):
+        for now in (True, 100.0, '100', None, float('nan'), float('inf'), -1):
+            with self.subTest(now=repr(now)):
+                view = replace(self.view, captured_at=1, sample_at=1)
+                result = self.check.evaluate(view, now)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertIn('clock', result['uncertainty'])
+        self.assertEqual(self.check.evaluate(self.view, 100)['state'], 'healthy')
+
+    def test_issue_validation_requires_integer_evaluation_clock(self):
+        for now in (True, 100.0, '100', None, float('nan'), float('inf'), -1):
+            with self.subTest(now=repr(now)), self.assertRaises(GuardError):
+                ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=now)
+        self.assertEqual(ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100), self.check)
+
+    def test_invalid_investigation_clock_never_drives_bot_or_mutates_check(self):
+        for now in (True, 100.0, '100', None, float('nan'), float('inf'), -1):
+            with self.subTest(now=repr(now)):
+                bot = FakeBrowser(replace(self.view, evidence_id='fresh', value=8))
+                result = investigate_chart(self.issue, self.check, bot, now=now)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIsNone(result['route'])
+                self.assertEqual(bot.reads, [])
+        # The same validated building block still supports a normal bounded release.
+        bot = FakeBrowser(replace(self.view, evidence_id='release-fresh', value=8))
+        monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 1000))
+        result = monitor.tick(100, bot)
+        self.assertEqual(result['state'], 'failure')
+        self.assertTrue(result['report'])
+        bot.view = replace(self.view, evidence_id='recovered', captured_at=400, sample_at=400)
+        self.assertTrue(monitor.tick(400, bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, bot))
+
     def test_observer_issue_independent_path_and_grounded_conclusion(self):
         bot = FakeBrowser(replace(self.view, evidence_id='bot-1', value=7))
         result = investigate_chart(self.issue, self.check, bot, now=100)

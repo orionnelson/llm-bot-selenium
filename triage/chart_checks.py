@@ -51,6 +51,8 @@ class ChartView:
     ui_version: str = 'chart-v1'
 
     def verify(self, binding, now):
+        if type(now) is not int or now < 0:
+            raise GuardError('nonnegative integer evaluation clock required')
         binding.check()
         if type(self.session_valid) is not bool:
             raise GuardError('typed session state required')
