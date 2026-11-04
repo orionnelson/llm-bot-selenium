@@ -34,6 +34,34 @@ class ChartJourneyTests(unittest.TestCase):
         self.issue = self.observer.stop()
         self.check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
 
+    def test_observer_rejects_negative_timestamps_without_appending(self):
+        for field in ('captured_at', 'sample_at'):
+            with self.subTest(field=field):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', replace(self.view, **{field: -1}))
+                self.assertEqual(observer.events, [])
+                observer.record('navigate', 'dashboard', self.view)
+                self.assertEqual(len(observer.stop().events), 1)
+
+    def test_check_conversion_rejects_negative_earlier_issue_timestamps(self):
+        first, last = self.issue.events
+        for field in ('captured_at', 'sample_at'):
+            with self.subTest(field=field):
+                invalid = replace(first, view=replace(first.view, evidence_id='earlier', **{field: -1}))
+                issue = replace(self.issue, events=(invalid, last))
+                with self.assertRaises(GuardError):
+                    ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
+        bot = FakeBrowser(replace(self.view, evidence_id='independent', value=8))
+        self.assertEqual(investigate_chart(self.issue, check, bot, now=100)['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        bot.view = replace(bot.view, evidence_id='release')
+        self.assertTrue(monitor.tick(100, bot)['report'])
+        bot.view = replace(self.view, evidence_id='recovery', captured_at=400, sample_at=400)
+        self.assertTrue(monitor.tick(400, bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, bot))
+
     def test_evaluation_clock_rejects_coercion_and_invalid_values(self):
         for now in (True, 100.0, '100', None, float('nan'), float('inf'), -1):
             with self.subTest(now=repr(now)):
