@@ -109,10 +109,10 @@ class SyntheticObserver:
         # Keep loading/expired evidence for the issue; interpretation must fail closed.
         identifier(view.evidence_id)
         identifier(view.ui_version)
-        if type(view.sample_at) is not int or type(view.session_valid) is not bool:
-            raise GuardError('typed sample timestamp and session state required')
-        if type(view.captured_at) is not int or (self.events and view.captured_at < self.events[-1].view.captured_at):
-            raise GuardError('ordered integer event timestamps required')
+        if type(view.sample_at) is not int or view.sample_at < 0 or type(view.session_valid) is not bool:
+            raise GuardError('nonnegative integer sample timestamp and typed session state required')
+        if type(view.captured_at) is not int or view.captured_at < 0 or (self.events and view.captured_at < self.events[-1].view.captured_at):
+            raise GuardError('ordered nonnegative integer event timestamps required')
         if view.state not in ('ready', 'loading', 'missing'):
             raise GuardError('invalid chart state')
         if view.value is not None and (type(view.value) not in (int, float) or not math.isfinite(view.value)):
