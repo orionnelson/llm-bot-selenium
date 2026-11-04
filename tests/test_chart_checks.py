@@ -34,6 +34,45 @@ class ChartJourneyTests(unittest.TestCase):
         self.issue = self.observer.stop()
         self.check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
 
+    def test_independent_read_rejects_sample_rollback_with_fresh_capture(self):
+        for value in (0, 8):
+            with self.subTest(value=value):
+                view = replace(self.view, evidence_id='new-capture-old-sample',
+                               captured_at=101, sample_at=99, value=value)
+                result = investigate_chart(self.issue, self.check, FakeBrowser(view), now=101)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIn('sample predates', result['conclusion']['uncertainty'])
+        view = replace(view, evidence_id='unchanged-sample', sample_at=100)
+        self.assertEqual(investigate_chart(self.issue, self.check, FakeBrowser(view), now=101)['conclusion']['state'], 'failure')
+
+    def test_release_sample_watermark_prevents_false_recovery_and_poisoning(self):
+        monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 120, cadence=1))
+        def tick(now, sample, value=0, **changes):
+            view = replace(self.view, evidence_id='sample-' + str(now), captured_at=now,
+                           sample_at=sample, value=value, **changes)
+            return monitor.tick(now, FakeBrowser(view))
+        # A still-fresh sample from before release start is legitimate initially.
+        self.assertEqual(tick(100, 99)['state'], 'healthy')
+        self.assertEqual(tick(101, 101, 8)['state'], 'failure')
+        for now, value in ((102, 0), (103, 8)):
+            rolled_back = tick(now, 100, value)
+            self.assertEqual(rolled_back['state'], 'unknown')
+            self.assertFalse(rolled_back['recovery'])
+            self.assertIn('sample predates', rolled_back['uncertainty'])
+            self.assertEqual(monitor.last_sample, 101)
+        # Invalid/loading/future and replay reads must never advance the watermark.
+        self.assertEqual(tick(104, 104, state='loading')['state'], 'unknown')
+        self.assertEqual(tick(105, 106)['state'], 'unknown')
+        replay = replace(self.view, evidence_id='sample-101', captured_at=106, sample_at=106)
+        self.assertEqual(monitor.tick(106, FakeBrowser(replay))['state'], 'unknown')
+        self.assertEqual(monitor.last_sample, 101)
+        recovered = tick(107, 101)
+        self.assertEqual(recovered['state'], 'healthy')
+        self.assertTrue(recovered['recovery'])
+        self.assertTrue(recovered['report'])
+        self.assertFalse(tick(108, 101)['report'])
+        self.assertIsNone(monitor.tick(120, FakeBrowser(self.view)))
+
     def test_observer_rejects_negative_timestamps_without_appending(self):
         for field in ('captured_at', 'sample_at'):
             with self.subTest(field=field):
