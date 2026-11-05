@@ -34,6 +34,24 @@ class ChartJourneyTests(unittest.TestCase):
         self.issue = self.observer.stop()
         self.check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
 
+    def test_observer_refuses_negative_values_without_poisoning_history(self):
+        for state in ('ready', 'loading', 'missing'):
+            with self.subTest(state=state):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', replace(self.view, value=-0.5, state=state))
+                self.assertEqual(observer.events, [])
+                # Missing data and signed zero remain valid representation inputs.
+                for value in (None, -0.0, 0, 8):
+                    observer.record('navigate', 'dashboard', replace(self.view, evidence_id='value-' + str(len(observer.events)), value=value, state=state))
+                self.assertEqual(len(observer.stop().events), 4)
+
+    def test_check_rejects_negative_value_hidden_in_earlier_issue_event(self):
+        first, last = self.issue.events
+        malformed = replace(first, view=replace(first.view, evidence_id='negative-earlier', value=-0.5))
+        with self.assertRaises(GuardError):
+            ChartCheck.from_issue(replace(self.issue, events=(malformed, last)), 1, sre_validated=True, now=100)
+
     def test_observer_refuses_post_capture_samples_in_all_states(self):
         for state in ('ready', 'loading', 'missing'):
             with self.subTest(state=state):

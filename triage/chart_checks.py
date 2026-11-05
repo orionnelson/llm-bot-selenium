@@ -117,8 +117,8 @@ class SyntheticObserver:
             raise GuardError('chart sample postdates its capture')
         if view.state not in ('ready', 'loading', 'missing'):
             raise GuardError('invalid chart state')
-        if view.value is not None and (type(view.value) not in (int, float) or not math.isfinite(view.value)):
-            raise GuardError('typed numeric chart value required')
+        if view.value is not None and (type(view.value) not in (int, float) or not math.isfinite(view.value) or view.value < 0):
+            raise GuardError('typed nonnegative numeric chart value required')
         if any(event.view.evidence_id == view.evidence_id and event.view != view for event in self.events):
             raise GuardError('conflicting observer evidence reference')
         self.events.append(IssueEvent(action, route, view))
