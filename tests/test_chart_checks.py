@@ -34,6 +34,22 @@ class ChartJourneyTests(unittest.TestCase):
         self.issue = self.observer.stop()
         self.check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
 
+    def test_observer_refuses_post_capture_samples_in_all_states(self):
+        for state in ('ready', 'loading', 'missing'):
+            with self.subTest(state=state):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', replace(self.view, sample_at=101, state=state))
+                self.assertEqual(observer.events, [])
+                observer.record('navigate', 'dashboard', replace(self.view, state=state))
+                self.assertEqual(len(observer.stop().events), 1)
+
+    def test_check_refuses_post_capture_sample_in_earlier_history(self):
+        first, last = self.issue.events
+        invalid = replace(first, view=replace(first.view, evidence_id='invalid-earlier', sample_at=101))
+        with self.assertRaises(GuardError):
+            ChartCheck.from_issue(replace(self.issue, events=(invalid, last)), 1, sre_validated=True, now=100)
+
     def test_independent_read_rejects_sample_rollback_with_fresh_capture(self):
         for value in (0, 8):
             with self.subTest(value=value):
@@ -232,8 +248,10 @@ class ChartJourneyTests(unittest.TestCase):
             with self.subTest(value=value):
                 inconsistent = replace(self.view, evidence_id='later-sample', sample_at=101, value=value)
                 observer = SyntheticObserver('sre', [self.binding], consent=True)
-                observer.record('navigate', 'dashboard', inconsistent)
-                issue = observer.stop()  # Preserve bad evidence, never validate it.
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', inconsistent)
+                self.assertEqual(observer.stop().events, ())
+                issue = replace(self.issue, events=(replace(self.issue.events[-1], view=inconsistent),))
                 with self.assertRaises(GuardError):
                     ChartCheck.from_issue(issue, 1, sre_validated=True, now=101)
                 bot = FakeBrowser(inconsistent)
