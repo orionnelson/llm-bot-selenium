@@ -50,6 +50,35 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_out_of_window_sample_refuses_capture_conversion_and_studio_export(self):
+        self.binding = replace(self.binding, context=replace(self.binding.context, start=50))
+        issue, check = self.issue()
+        first, last = issue.events
+        self.changes = {'sample_at': 49}
+        self.sre.read_chart('dashboard', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        with self.assertRaises(GuardError):
+            self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(observer.events, [])
+        forged = replace(issue, events=(replace(first, view=replace(first.view, sample_at=49)), last))
+        with self.assertRaises(GuardError):
+            ChartCheck.from_issue(forged, 1, sre_validated=True, now=100)
+        with self.assertRaises(GuardError):
+            self.sre.export_studio_session(forged, consent=True)
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'unknown')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertEqual(monitor.tick(100, self.bot)['state'], 'unknown')
+        self.changes = {}
+        self.sre.read_chart('dashboard', self.binding)
+        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(len(observer.stop().events), 1)
+        self.assertEqual(len(self.sre.export_studio_session(issue, consent=True)['events']), 2)
+        self.value = 8
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'failure')
+        self.now, self.value = 400, 0
+        self.assertTrue(monitor.tick(400, self.bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, self.bot))
+
     def test_negative_values_refuse_capture_conversion_and_studio_export(self):
         issue, check = self.issue()
         first, last = issue.events

@@ -115,6 +115,8 @@ class SyntheticObserver:
             raise GuardError('ordered nonnegative integer event timestamps required')
         if view.sample_at > view.captured_at:
             raise GuardError('chart sample postdates its capture')
+        if not view.binding.context.start <= view.sample_at <= view.binding.context.end:
+            raise GuardError('sample outside bound chart time window')
         if view.state not in ('ready', 'loading', 'missing'):
             raise GuardError('invalid chart state')
         if view.value is not None and (type(view.value) not in (int, float) or not math.isfinite(view.value) or view.value < 0):
