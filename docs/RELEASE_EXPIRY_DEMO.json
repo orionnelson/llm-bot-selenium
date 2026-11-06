@@ -1,0 +1,120 @@
+{
+  "source_base": "2ae8cb5da3632b29b6886887346e96acf2c68f9d",
+  "chart_checks_sha256": "15c5b3c693874818585554dba9d88bb322813487fd721fe383c8735bca05a56f",
+  "transport": "actual loopback HTTP/Selenium waits; fake DOM and synthetic expiry inputs",
+  "browser_model_video": "NOT RUN",
+  "observer_actions": [
+    "navigate",
+    "shortcut-open-chart"
+  ],
+  "invalid_reference_expiry": {
+    "state": "unknown",
+    "evidence": null,
+    "uncertainty": "chart read failed",
+    "duplicate": false,
+    "recovery": false,
+    "report": true
+  },
+  "expired_plan_stopped_without_later_read": true,
+  "untyped_session_states": [
+    {
+      "input": 0,
+      "result": "unknown",
+      "stopped": false,
+      "recovery": true
+    },
+    {
+      "input": "",
+      "result": "unknown",
+      "stopped": false,
+      "recovery": true
+    },
+    {
+      "input": null,
+      "result": "unknown",
+      "stopped": false,
+      "recovery": true
+    },
+    {
+      "input": "false",
+      "result": "unknown",
+      "stopped": false,
+      "recovery": true
+    }
+  ],
+  "fresh_independent": {
+    "observed": {
+      "state": "healthy",
+      "evidence": "observed-last",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause"
+    },
+    "conclusion": {
+      "state": "failure",
+      "evidence": "fresh-bot",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause"
+    },
+    "route": "entity-chart"
+  },
+  "same_check_release": [
+    {
+      "at": 100,
+      "state": "failure",
+      "evidence": "tick-100",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 400,
+      "state": "failure",
+      "evidence": "tick-400",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": true,
+      "recovery": false,
+      "report": false
+    },
+    {
+      "at": 700,
+      "state": "healthy",
+      "evidence": "tick-700",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": true,
+      "report": true
+    },
+    {
+      "at": 1000,
+      "state": "unknown",
+      "evidence": "tick-1000",
+      "uncertainty": "chart loading or missing",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 1300,
+      "state": "healthy",
+      "evidence": "tick-1300",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": true,
+      "report": true
+    }
+  ],
+  "cadence": 300,
+  "bounded_end": true,
+  "observer_unchanged": true
+}
