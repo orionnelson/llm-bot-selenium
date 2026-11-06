@@ -258,12 +258,14 @@ class ReleaseMonitor:
             raise GuardError('monitor requires a separate browser session')
         # Skip missed slots rather than burst/replay; always collect current evidence.
         self.next_due = self.plan.start + ((now - self.plan.start) // self.plan.cadence + 1) * self.plan.cadence
+        expired = False
         try:
             view = bot.read_chart('entity-chart', self.plan.check.binding)
             if self.stopped:
                 return None
             if bot.session != session:
                 raise GuardError('monitor session changed during chart read')
+            expired = view.session_valid is False
             identifier(view.evidence_id)
             result = self.plan.check.evaluate(view, now, captured_since=self.last_capture, sampled_since=self.last_sample)
             if view.evidence_id in self.seen_evidence:
@@ -272,13 +274,13 @@ class ReleaseMonitor:
                 self.last_capture = view.captured_at
                 self.last_sample = view.sample_at
             self.seen_evidence.add(view.evidence_id)
-            if not view.session_valid:
-                self.stop()
         except Exception:
             if self.stopped:
                 return None
             # Transport failures have no trusted evidence. Do not leak raw exception text.
             result = {'state': 'unknown', 'evidence': None, 'uncertainty': 'chart read failed'}
+        if expired:
+            self.stop()
         result['duplicate'] = result['state'] == self.last_state
         result['recovery'] = result['state'] == 'healthy' and self.last_state in ('failure', 'unknown')
         result['report'] = result['recovery'] or (result['state'] in ('failure', 'unknown') and not result['duplicate'])

@@ -50,6 +50,27 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_expiry_with_invalid_reference_stops_same_observed_release_check(self):
+        issue, check = self.issue()
+        self.changes = {'evidence_id': 'https://private.invalid/token', 'session_valid': False}
+        independent = investigate_chart(issue, check, self.bot, now=100)
+        self.assertEqual(independent['conclusion']['state'], 'unknown')
+        self.assertIsNone(independent['conclusion']['evidence'])
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        result = monitor.tick(100, self.bot)
+        self.assertEqual(result['state'], 'unknown')
+        self.assertIsNone(result['evidence'])
+        self.assertTrue(monitor.stopped)
+        routes = len(self.routes)
+        self.changes = {}
+        self.now = 400
+        self.assertIsNone(monitor.tick(400, self.bot))
+        self.assertEqual(len(self.routes), routes)
+        # Reauthentication never silently restarts the stopped plan.
+        fresh = ReleaseMonitor(ReleasePlan(check, 400, 1000))
+        self.assertEqual(fresh.tick(400, self.bot)['state'], 'healthy')
+        self.assertIs(fresh.plan.check, check)
+
     def test_out_of_window_sample_refuses_capture_conversion_and_studio_export(self):
         self.binding = replace(self.binding, context=replace(self.binding.context, start=50))
         issue, check = self.issue()

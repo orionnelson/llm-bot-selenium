@@ -442,6 +442,46 @@ class ChartJourneyTests(unittest.TestCase):
         self.assertIs(monitor.plan.check, self.check)  # exact observed check is reused
         self.assertEqual(monitor.plan.cadence, 300)
 
+    def test_expired_release_stops_even_with_malformed_evidence_reference(self):
+        for evidence in (None, 7, [], {}, 'https://private.invalid/token'):
+            with self.subTest(evidence=evidence):
+                monitor = self.monitor()
+                bot = FakeBrowser(replace(self.view, evidence_id=evidence, session_valid=False))
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertIsNone(result['evidence'])
+                self.assertTrue(result['report'])
+                self.assertTrue(monitor.stopped)
+                self.assertIsNone(monitor.tick(400, bot))
+                self.assertEqual(len(bot.reads), 1)
+                self.assertEqual(monitor.seen_evidence, {self.check.source_evidence, *self.check.observer_evidence})
+
+    def test_expiry_from_switched_session_cannot_stop_original_release(self):
+        monitor = self.monitor()
+        bot = FakeBrowser(replace(self.view, evidence_id='expired', session_valid=False))
+        def switched(route, binding):
+            bot.session = 'other-session'
+            return bot.view
+        bot.read_chart = switched
+        result = monitor.tick(100, bot)
+        self.assertEqual(result['state'], 'unknown')
+        self.assertIsNone(result['evidence'])
+        self.assertFalse(monitor.stopped)
+
+    def test_untyped_expiry_cannot_stop_release_and_valid_read_recovers(self):
+        for state in (0, '', None, 'false'):
+            with self.subTest(state=state):
+                monitor = self.monitor()
+                bot = FakeBrowser(replace(self.view, evidence_id='untyped', session_valid=state))
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertFalse(monitor.stopped)
+                bot.view = replace(self.view, evidence_id='recovered', captured_at=400, sample_at=400)
+                result = monitor.tick(400, bot)
+                self.assertEqual(result['state'], 'healthy')
+                self.assertTrue(result['recovery'])
+                self.assertEqual(len(bot.reads), 2)
+
     def test_release_unknown_evidence_and_expired_session_stop(self):
         for defect in ['loading', 'missing', 'stale', 'wrong-context', 'drift', 'expired']:
             with self.subTest(defect=defect):
