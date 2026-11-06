@@ -34,6 +34,30 @@ class ChartJourneyTests(unittest.TestCase):
         self.issue = self.observer.stop()
         self.check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
 
+    def test_observer_refuses_samples_outside_bound_window_in_all_states(self):
+        binding = replace(self.binding, context=replace(self.binding.context, start=50, end=150))
+        for state in ('ready', 'loading', 'missing'):
+            for sample in (49, 151):
+                with self.subTest(state=state, sample=sample):
+                    observer = SyntheticObserver('sre', [binding], consent=True)
+                    view = replace(self.view, binding=binding, captured_at=200, sample_at=sample, state=state)
+                    with self.assertRaises(GuardError):
+                        observer.record('navigate', 'dashboard', view)
+                    self.assertEqual(observer.events, [])
+                    for boundary in (50, 150):
+                        observer.record('navigate', 'dashboard', replace(view, evidence_id='boundary-' + str(boundary), sample_at=boundary))
+                    self.assertEqual(len(observer.stop().events), 2)
+
+    def test_check_refuses_out_of_window_sample_hidden_before_valid_final(self):
+        binding = replace(self.binding, context=replace(self.binding.context, start=50, end=150))
+        first, last = self.issue.events
+        last = replace(last, view=replace(last.view, binding=binding, captured_at=200))
+        for sample in (49, 151):
+            with self.subTest(sample=sample):
+                invalid = replace(first, view=replace(first.view, binding=binding, evidence_id="outside-window", captured_at=200, sample_at=sample))
+                with self.assertRaises(GuardError):
+                    ChartCheck.from_issue(replace(self.issue, events=(invalid, last)), 1, sre_validated=True, now=200)
+
     def test_observer_refuses_negative_values_without_poisoning_history(self):
         for state in ('ready', 'loading', 'missing'):
             with self.subTest(state=state):
