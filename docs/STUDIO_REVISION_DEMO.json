@@ -1,0 +1,40 @@
+{
+  "evidence": "actual loopback HTTP; synthetic model double, not inference or browser",
+  "beforeThreshold": 3,
+  "savedThreshold": 9,
+  "rejectedBeforeModel": [
+    {
+      "clientRevision": "missing",
+      "status": 409,
+      "candidateReturned": false
+    },
+    {
+      "clientRevision": "stale",
+      "status": 409,
+      "candidateReturned": false
+    },
+    {
+      "clientRevision": "wildcard",
+      "status": 409,
+      "candidateReturned": false
+    },
+    {
+      "clientRevision": "malformed",
+      "status": 409,
+      "candidateReturned": false
+    }
+  ],
+  "reloadedRevision": {
+    "status": 200,
+    "modelCalls": 1,
+    "modelTaskThreshold": 9,
+    "review": "pending",
+    "executed": false
+  },
+  "canonicalSourceUnchangedByGeneration": true,
+  "sourceSHA256": {
+    "triage/dag_server.py": "0df7e2200ba82856e15525fc8eb79531a814e4ca16f0c7be419c09fff2bf4ac9",
+    "ui/src/App.tsx": "fe227ed8fcac903b796994ed3d8f62ae11917f2093f9159e511d465bdf588a19",
+    "ui/src/PythonInspector.tsx": "7a6610ee8034d240dd34513ea90b1ec9af31af9d0a5d947d51273d8ebef157c5"
+  }
+}
