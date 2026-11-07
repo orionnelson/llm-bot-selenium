@@ -176,6 +176,8 @@ def handler(dag_path, assets, *, test_mode=False, recordings=None):
                 if not isinstance(node_id, str) or not isinstance(instructions, str) or not 1 <= len(instructions) <= 12000:
                     raise ValueError('Invalid generation request')
                 current = snapshot(dag_path)
+                if self.headers.get('If-Match') != current['revision']:
+                    return self.reply(409, {'error': 'DAG changed; reload the saved task before generating'})
                 dag = DAG.from_spec(current['definition'])
                 if not any(t.task_id == node_id for t in dag.tasks):
                     return self.reply(409, {'error': 'Save the DAG before generating for this task'})

@@ -104,9 +104,34 @@ class GenerationTests(unittest.TestCase):
         with backend(saved()) as (port, path, _):
             before = path.read_bytes()
             with patch('triage.test_codegen.generate') as api:
-                self.assertEqual(request(port, 'POST', '{}', {'Content-Type': 'application/json'}, '/api/python/generate')[0], 503)
+                self.assertEqual(request(port, 'POST', '{}', {'Content-Type': 'application/json', 'If-Match': request(port)[1]['revision']}, '/api/python/generate')[0], 503)
             api.assert_not_called()
             self.assertEqual(request(port, path='/api/test/status')[0], 503)
+            self.assertEqual(path.read_bytes(), before)
+
+    def test_generation_requires_current_client_revision_before_model_access(self):
+        with backend(saved(), test_mode=True) as (port, path, _):
+            original = request(port)[1]
+            changed = replace(saved(), tasks=(replace(saved().tasks[0],
+                predicate={**saved().tasks[0].predicate, 'threshold': 9}), *saved().tasks[1:]))
+            current = commit(port, original['revision'], changed.to_spec())[1]
+            before = path.read_bytes()
+            body = json.dumps({'nodeId': 'saved', 'instructions': 'Synthetic comparison'})
+            candidate = {'source': SOURCE, 'model': MODEL, 'review': 'pending', 'executed': False}
+            with patch('triage.test_codegen.generate', return_value=candidate) as api:
+                for revision in (None, '', original['revision'], '*', 'malformed'):
+                    headers = {'Content-Type': 'application/json'}
+                    if revision is not None:
+                        headers['If-Match'] = revision
+                    status, value = request(port, 'POST', body, headers, '/api/python/generate')
+                    self.assertEqual(status, 409)
+                    self.assertNotIn('source', value)
+                api.assert_not_called()
+                status, value = request(port, 'POST', body, {'Content-Type': 'application/json',
+                    'If-Match': current['revision']}, '/api/python/generate')
+                self.assertEqual(status, 200)
+                self.assertEqual(value, candidate)
+                self.assertEqual(api.call_args.args, (changed, 'saved', 'Synthetic comparison'))
             self.assertEqual(path.read_bytes(), before)
 
     def test_enabled_http_does_not_forward_browser_config_or_persist_candidate(self):
@@ -114,13 +139,13 @@ class GenerationTests(unittest.TestCase):
             before = path.read_bytes()
             body = {'nodeId': 'saved', 'instructions': 'Synthetic comparison', 'config': {'token': 'must-not-forward'}}
             with patch('triage.test_codegen.generate', return_value={'source': SOURCE, 'model': MODEL, 'review': 'pending', 'executed': False}) as api:
-                code, result = request(port, 'POST', json.dumps(body), {'Content-Type': 'application/json'}, '/api/python/generate')
+                code, result = request(port, 'POST', json.dumps(body), {'Content-Type': 'application/json', 'If-Match': request(port)[1]['revision']}, '/api/python/generate')
                 self.assertEqual(code, 200)
                 self.assertEqual(api.call_args.args, (saved(), 'saved', 'Synthetic comparison'))
                 self.assertFalse(result['executed'])
             self.assertEqual(path.read_bytes(), before)
             body['nodeId'] = 'unsaved'
-            self.assertEqual(request(port, 'POST', json.dumps(body), {'Content-Type': 'application/json'}, '/api/python/generate')[0], 409)
+            self.assertEqual(request(port, 'POST', json.dumps(body), {'Content-Type': 'application/json', 'If-Match': request(port)[1]['revision']}, '/api/python/generate')[0], 409)
             with patch.dict('os.environ', {}, clear=True):
                 status_value = request(port, path='/api/test/status')[1]
                 self.assertEqual(status_value['grid']['ready'], False)
@@ -132,9 +157,9 @@ class GenerationTests(unittest.TestCase):
             before = path.read_bytes()
             body = json.dumps({'nodeId': 'saved', 'instructions': 'Synthetic comparison'})
             with patch('triage.test_codegen.generate', side_effect=URLError('blocked')):
-                self.assertEqual(request(port, 'POST', body, {'Content-Type': 'application/json'}, '/api/python/generate')[0], 502)
+                self.assertEqual(request(port, 'POST', body, {'Content-Type': 'application/json', 'If-Match': request(port)[1]['revision']}, '/api/python/generate')[0], 502)
             for body in ('[]', '{}', '{'):
-                self.assertEqual(request(port, 'POST', body, {'Content-Type': 'application/json'}, '/api/python/generate')[0], 400)
+                self.assertEqual(request(port, 'POST', body, {'Content-Type': 'application/json', 'If-Match': request(port)[1]['revision']}, '/api/python/generate')[0], 400)
             self.assertEqual(path.read_bytes(), before)
 
 
@@ -150,7 +175,7 @@ class GenerationTests(unittest.TestCase):
                     return candidate
                 body = json.dumps({'nodeId': 'saved', 'instructions': 'Synthetic comparison'})
                 def generate_request():
-                    return request(port, 'POST', body, {'Content-Type': 'application/json'}, '/api/python/generate')
+                    return request(port, 'POST', body, {'Content-Type': 'application/json', 'If-Match': request(port)[1]['revision']}, '/api/python/generate')
                 with patch('triage.test_codegen.generate', side_effect=slow):
                     worker = Thread(target=lambda: responses.append(generate_request()))
                     worker.start()
@@ -192,7 +217,7 @@ class GenerationTests(unittest.TestCase):
             return {'source': SOURCE, 'model': MODEL, 'review': 'pending', 'executed': False}
         with backend(saved(), test_mode=True) as (port, _, _), patch('triage.test_codegen.generate', side_effect=slow):
             body = json.dumps({'nodeId': 'saved', 'instructions': 'Synthetic comparison'})
-            worker = Thread(target=lambda: request(port, 'POST', body, {'Content-Type': 'application/json'}, '/api/python/generate'))
+            worker = Thread(target=lambda: request(port, 'POST', body, {'Content-Type': 'application/json', 'If-Match': request(port)[1]['revision']}, '/api/python/generate'))
             worker.start()
             try:
                 self.assertTrue(entered.wait(2))
@@ -202,7 +227,7 @@ class GenerationTests(unittest.TestCase):
                 self.assertEqual(response.status, 200)
                 response.read()
                 connection.close()
-                self.assertEqual(request(port, 'POST', body, {'Content-Type': 'application/json'}, '/api/python/generate')[0], 429)
+                self.assertEqual(request(port, 'POST', body, {'Content-Type': 'application/json', 'If-Match': request(port)[1]['revision']}, '/api/python/generate')[0], 429)
             finally:
                 release.set()
                 worker.join(5)
