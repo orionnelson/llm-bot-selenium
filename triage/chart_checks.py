@@ -68,7 +68,7 @@ class ChartView:
             raise GuardError('sample outside bound chart time window')
         if self.state != 'ready':
             raise GuardError('chart loading or missing')
-        if type(self.value) not in (int, float) or not math.isfinite(self.value) or self.value < 0:
+        if type(self.value) not in (int, float) or (type(self.value) is float and not math.isfinite(self.value)) or self.value < 0:
             raise GuardError('missing or invalid chart value')
 
 
@@ -119,7 +119,7 @@ class SyntheticObserver:
             raise GuardError('sample outside bound chart time window')
         if view.state not in ('ready', 'loading', 'missing'):
             raise GuardError('invalid chart state')
-        if view.value is not None and (type(view.value) not in (int, float) or not math.isfinite(view.value) or view.value < 0):
+        if view.value is not None and (type(view.value) not in (int, float) or (type(view.value) is float and not math.isfinite(view.value)) or view.value < 0):
             raise GuardError('typed nonnegative numeric chart value required')
         if any(event.view.evidence_id == view.evidence_id and event.view != view for event in self.events):
             raise GuardError('conflicting observer evidence reference')
@@ -146,14 +146,14 @@ class ChartCheck:
             raise GuardError('bounded immutable observer evidence required')
         for evidence in self.observer_evidence:
             identifier(evidence)
-        if type(self.maximum) not in (int, float) or not math.isfinite(self.maximum) or self.maximum < 0:
+        if type(self.maximum) not in (int, float) or (type(self.maximum) is float and not math.isfinite(self.maximum)) or self.maximum < 0:
             raise GuardError('explicit finite nonnegative maximum required')
 
     @classmethod
     def from_issue(cls, issue, maximum, *, sre_validated=False, now):
         if sre_validated is not True or not 1 <= len(issue.events) <= 100:
             raise GuardError('explicit SRE validation and observed chart required')
-        if type(maximum) not in (int, float) or not math.isfinite(maximum) or maximum < 0:
+        if type(maximum) not in (int, float) or (type(maximum) is float and not math.isfinite(maximum)) or maximum < 0:
             raise GuardError('explicit finite nonnegative maximum required')
         # Dataclass construction is not proof that recorder guards ran.
         checked = SyntheticObserver(issue.observer_session, [e.view.binding for e in issue.events], consent=True)

@@ -50,6 +50,25 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_large_explicit_threshold_survives_http_journey_without_relaxing_dom_budget(self):
+        issue, _ = self.issue()
+        huge = 10 ** 400
+        check = ChartCheck.from_issue(issue, huge, sre_validated=True, now=100)
+        self.value = 8
+        result = investigate_chart(issue, check, self.bot, now=100)
+        self.assertEqual(result['conclusion']['state'], 'healthy')
+        self.assertEqual(result['conclusion']['maximum'], huge)
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertEqual(monitor.tick(100, self.bot)['state'], 'healthy')
+        # The existing DOM text budget still rejects giant page values.
+        self.now, self.value = 400, huge
+        self.assertEqual(monitor.tick(400, self.bot)['state'], 'unknown')
+        self.now, self.value = 700, 0
+        self.assertTrue(monitor.tick(700, self.bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, self.bot))
+        self.assertTrue(monitor.stopped)
+        self.assertIs(monitor.plan.check, check)
+
     def test_expiry_with_invalid_reference_stops_same_observed_release_check(self):
         issue, check = self.issue()
         self.changes = {'evidence_id': 'https://private.invalid/token', 'session_valid': False}
