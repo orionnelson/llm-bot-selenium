@@ -34,6 +34,47 @@ class ChartJourneyTests(unittest.TestCase):
         self.issue = self.observer.stop()
         self.check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
 
+    def test_large_integer_chart_values_are_finite_without_float_coercion(self):
+        huge = 10 ** 400
+        for value in (huge, huge + 1):
+            with self.subTest(value=value):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                view = replace(self.view, value=value)
+                observer.record('navigate', 'dashboard', view)
+                check = ChartCheck.from_issue(observer.stop(), huge, sre_validated=True, now=100)
+                self.assertEqual(check.maximum, huge)
+                expected = 'healthy' if value == huge else 'failure'
+                self.assertEqual(check.evaluate(view, 100)['state'], expected)
+        check = replace(self.check, maximum=huge)
+        self.assertEqual(check.evaluate(replace(self.view, value=huge + 1), 100)['state'], 'failure')
+
+    def test_large_integer_independent_and_same_check_release_keep_exact_comparison(self):
+        huge = 10 ** 400
+        # Ordinary observed chart; only the explicit threshold is very large.
+        check = replace(self.check, maximum=huge)
+        bot = FakeBrowser(replace(self.view, evidence_id='bot-huge', value=huge + 1))
+        result = investigate_chart(self.issue, check, bot, now=100)
+        self.assertEqual(result['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertEqual(monitor.tick(100, bot)['state'], 'failure')
+        bot.view = replace(bot.view, evidence_id='bot-recovery', captured_at=400, sample_at=400, value=huge)
+        self.assertTrue(monitor.tick(400, bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, bot))
+        self.assertTrue(monitor.stopped)
+
+    def test_numeric_domain_still_rejects_negative_boolean_and_nonfinite_values(self):
+        for value in (-10 ** 400, True, False, float('nan'), float('inf'), -float('inf')):
+            with self.subTest(value=value):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', replace(self.view, value=value))
+                self.assertEqual(observer.events, [])
+                with self.assertRaises(GuardError):
+                    replace(self.check, maximum=value)
+                with self.assertRaises(GuardError):
+                    ChartCheck.from_issue(self.issue, value, sre_validated=True, now=100)
+                self.assertEqual(self.check.evaluate(replace(self.view, value=value), 100)['state'], 'unknown')
+
     def test_observer_refuses_samples_outside_bound_window_in_all_states(self):
         binding = replace(self.binding, context=replace(self.binding.context, start=50, end=150))
         for state in ('ready', 'loading', 'missing'):
