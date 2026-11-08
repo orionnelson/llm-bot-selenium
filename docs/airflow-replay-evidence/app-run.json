@@ -1,0 +1,6 @@
+{
+  "httpStatus": 502,
+  "result": {
+    "error": "Airflow unavailable or request unresolved; refresh status before retrying"
+  }
+}

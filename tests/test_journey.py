@@ -35,7 +35,7 @@ class Driver:
     def get_screenshot_as_png(self): return png()
     def execute_script(self,script,*args):
         if script==OBSERVE_PUBLIC:
-            return {'url':self.current_url,'documentUri':self.current_url,'title':'Public test','text':'Projects Security News '+('CyberScoop 10 Articles' if self.clicked else ''),'candidates':[{'id':'c0','label':'Projects','kind':'heading','href':None,'expanded':None},{'id':'c1','label':'Security News','kind':'control','href':'javascript:void(0);','expanded':None}], 'facts':[{'id':'f0','label':'CyberScoop','count':10,'text':'CyberScoop 10 Articles'}] if self.clicked else []}
+            return {'url':self.current_url,'documentUri':self.current_url,'title':'Public test','text':'Projects Security News '+('CyberScoop 10 Articles' if self.clicked else ''),'candidates':[{'id':'c0','label':'Projects','kind':'heading','href':None,'expanded':None},{'id':'c1','label':'Security News','kind':'control','href':'javascript:void(0);','expanded':'true' if self.clicked else 'false'}], 'facts':[{'id':'f0','label':'CyberScoop','count':10,'text':'CyberScoop 10 Articles'}] if self.clicked else []}
         return None
 
 class JourneyTests(unittest.TestCase):

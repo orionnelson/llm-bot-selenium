@@ -3,9 +3,10 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import re
 from threading import Event, Thread
 import time
-from urllib.parse import urlsplit
+from urllib.parse import urlsplit, urljoin
 from uuid import uuid4
 
 from .browser_loop import BrowserBlocked, DANGEROUS, SECRET_PATH, save, write_frame
@@ -15,7 +16,7 @@ from .public_browser import public_url, PublicRequests
 from .test_codegen import complete
 from .browser_function import parse_function
 
-CODER = 'Qwen3-Coder-30B-A3B-Instruct-1M-Q4_K_M'
+CODER = 'Qwen3.6-35B-A3B-UD-Q4_K_M-no-think'
 # Never collect form values, editable/private text, passwords, cookies or page source.
 OBSERVE_PUBLIC = r"""
 const ignore='input,textarea,select,form,[contenteditable],[data-private],script,style,[hidden],[aria-hidden="true"]';
@@ -94,15 +95,61 @@ def observe(driver):
     return value
 
 
+def simple_action_goal(instruction):
+    return bool(re.match(r'^(?:please\s+)?(?:click|open|go to|navigate|hover|scroll|find)\s+', instruction, re.I)) and not re.search(r'\b(?:read|inspect|screenshot|capture|check|count)\b', instruction, re.I)
+
+
+def action_completed(instruction, actions):
+    request = re.match(r'^(?:please\s+)?(click|open|go to|navigate(?: to)?|hover(?: over)?|scroll(?: to)?|find)\s+(.+)', instruction, re.I)
+    if not request: return True
+    verb, target = request.groups()
+    required = 'hover' if verb.lower().startswith('hover') else 'scroll' if verb.lower().startswith(('scroll', 'find')) else 'click'
+    target = re.split(r"\b(?:do not|don't|never|but not)\b", target, maxsplit=1, flags=re.I)[0]
+    target = re.split(r'\s+(?:sideways\b|(?:on|at|in)\s+(?:the\s+)?(?:right|left|top|bottom|middle|center|side|screen)\b)', target, maxsplit=1, flags=re.I)[0]
+    if required == 'scroll':
+        # Direction/pacing before 'to' describes movement, not the destination label.
+        target = re.sub(r'^(?:(?:up|down|dow|upwards|downwards|slowly|quickly)\b.*?)?to\s+', '', target, flags=re.I)
+    target = re.split(r'\s+(?:to|so that|in order to)\s+', target, maxsplit=1, flags=re.I)[0]
+    words = set(re.findall(r'[a-z0-9]+', target.lower())) - {'the','a','an','over','to','button','link','menu','section','dropdown','please','tab','page','item','option','control','up','down'}
+    # Relative targets need page context; explicit control names must match the dispatched label.
+    relative = bool(words & {'first','last','latest','recent','next','previous','article','articles'})
+    return any(a.get('action') == required and (relative or not words or words.issubset(set(re.findall(r'[a-z0-9]+', a.get('label','').lower())))) for a in actions)
+
+
+def click_matches(instruction, candidate):
+    # Negative targets are exclusions, not extra positive matching words.
+    for excluded in re.findall(r"(?:do not|don't|never|but not)\s+(?:click\s+|open\s+)?([^,;.]+)", instruction, re.I):
+        if action_completed('Click ' + excluded, [{'action': 'click', 'label': candidate['label']}]): return False
+    if not re.match(r'^(?:please\s+)?(?:click|open|go to|navigate(?: to)?)\s+', instruction, re.I): return True
+    return action_completed(instruction, [{'action': 'click', 'label': candidate['label']}])
+
+
+def click_target(instruction, observation, selected=None):
+    direct = bool(re.match(r'^(?:please\s+)?(?:click|open|go to|navigate(?: to)?)\s+', instruction, re.I))
+    candidates = [c for c in observation['candidates'] if c['kind'] == 'control' and click_matches(instruction, c)]
+    if direct:
+        if not candidates: raise BrowserBlocked('The requested click target is not observed. No unrelated control clicked.')
+        if len(candidates) != 1: raise BrowserBlocked('The requested click target is ambiguous. Name a unique control; no click sent.')
+    if selected is not None:
+        if selected not in candidates: raise BrowserBlocked('The proposed click does not match the requested target. No click sent.')
+        candidates = [selected]
+    for candidate in candidates if direct or selected is not None else []:
+        href = candidate.get('href')
+        if href and urlsplit(urljoin(observation.get('url', 'https://example.com/'), href)).scheme == 'mailto':
+            raise BrowserBlocked('The requested Email control opens an external mail client (mailto:), not a web page. No click sent, no email sent, and no unrelated control substituted.')
+    return candidates
+
+
 def propose_step(instruction, observation):
     # Constrain generated source to one fresh, observed operation, not free-form Python.
     evidence = observation['evidence']
+    click_target(instruction, observation)
     reading = 'read' in instruction.lower() and 'article' in instruction.lower()
     methods = ['read_articles'] if reading and observation.get('articles') else [] if reading else ['observe', 'screenshot']
     sources = ['def run(browser):\n    browser.' + method + '(' + json.dumps(evidence) + ')' for method in methods]
     if not reading or not observation.get('articles'):
         for candidate in observation['candidates']:
-            choices = ['scroll'] + (['click'] if candidate['kind'] == 'control' and not DANGEROUS.search(candidate['label']) else [])
+            choices = ['scroll'] + (['click'] if candidate['kind'] == 'control' and click_matches(instruction, candidate) and not DANGEROUS.search(candidate['label']) else [])
             for action in choices:
                 sources.append('def run(browser):\n    browser.' + action + '(' + json.dumps(candidate['id']) + ', ' + json.dumps(evidence) + ')')
     if not sources: raise BrowserBlocked('No observed safe operation can satisfy this instruction')
@@ -118,27 +165,32 @@ def propose_step(instruction, observation):
         error = BrowserBlocked(str(exc)); error.proposal = value
         raise error from None
     if operation['python'] not in sources: raise BrowserBlocked('Function is not one of the fresh observed operations')
+    if operation['action'] == 'finish' and not action_completed(instruction, observation.get('completedActions', [])):
+        raise BrowserBlocked('Complete the requested browser action and target before finishing this instruction')
     operation['result'] = value['result']
     if operation['action'] in ('finish', 'read'): return operation
     candidate = next((c for c in observation['candidates'] if c['id'] == operation['candidate']), None)
     if not candidate or operation['action'] == 'click' and candidate['kind'] != 'control':
         raise BrowserBlocked('Coder chose a control not present on the observed page')
+    if operation['action'] == 'click': click_target(instruction, observation, candidate)
     if operation['action'] == 'click' and DANGEROUS.search(candidate['label']):
         raise BrowserBlocked('A public read-only journey cannot perform this action')
     return operation
 
 
-def reveal(driver, target):
+def reveal(driver, target, guard=lambda: None):
     """Use real page scrolling, including fixed/smooth-scrolling layouts; never force a JS click."""
     driver.execute_script("const e=arguments[0],before=scrollY;e.scrollIntoView({block:'center',behavior:'instant'});const r=e.getBoundingClientRect();if((r.top<0||r.bottom>innerHeight)&&scrollY===before)window.scrollBy({top:r.top+r.height/2-innerHeight/2,behavior:'instant'});", target)
     from selenium.webdriver.support.ui import WebDriverWait
     previous = [None]
     def reachable(browser):
+        guard()
         value = browser.execute_script("const e=arguments[0],r=e.getBoundingClientRect(),x=r.left+Math.min(r.width/2,30),y=r.top+r.height/2,h=document.elementFromPoint(x,y);return {x:r.x,y:r.y,visible:r.width>0&&r.height>0&&r.top>=0&&r.bottom<=innerHeight&&r.left>=0&&x<innerWidth,hit:!!h&&(e.contains(h)||h.contains(e))};", target)
         stable = previous[0] is not None and abs(previous[0]['x']-value['x'])<2 and abs(previous[0]['y']-value['y'])<2
         previous[0] = value
-        return value['visible'] and value['hit'] and stable
-    try: WebDriverWait(driver, 45, poll_frequency=.25).until(reachable)
+        return value if value['visible'] and value['hit'] and stable else False
+    try: return WebDriverWait(driver, 45, poll_frequency=.25).until(reachable)
+    except (InterruptedError, TimeoutError): raise
     except Exception: raise BrowserBlocked('The page is still covering or moving the requested control. No forced click or successful step claimed.')
 
 
@@ -191,6 +243,7 @@ def run_journey(manager, folder, value, event):
                 # Hash the action history too: a proposal is bound to both page and completed actions.
                 observation['evidence'] = hashlib.sha256(json.dumps(observation, sort_keys=True).encode()).hexdigest()
                 value['phase'] = 'thinking'; value['modelCalls'] += 1; persist()
+                click_target(instruction, observation)
                 proposal = propose_step(instruction, observation); guard()
                 current.update(evidence=observation['evidence'], proposal=proposal, action=proposal['action'])
                 if proposal.get('python'):
@@ -222,6 +275,9 @@ def run_journey(manager, folder, value, event):
                     current['completedMs'] = value['frameTimesMs'][-1]
                     persist(); break
                 candidate = next(c for c in observation['candidates'] if c['id'] == proposal['candidate'])
+                if proposal['action'] == 'click': click_target(instruction, observation, candidate)
+                if any(a.get('candidate') == candidate['id'] and a['action'] == proposal['action'] for a in completed):
+                    raise BrowserBlocked('Successful action already recorded; no duplicate dispatch')
                 fresh = observe(driver)
                 now = next((c for c in fresh['candidates'] if c['id'] == candidate['id']), None)
                 if fresh['url'] != observation['url'] or now != candidate: raise BrowserBlocked('The observed control changed while the coder was planning')
@@ -229,32 +285,46 @@ def run_journey(manager, folder, value, event):
                 target = driver.find_element('css selector', selector)
                 if not target.is_displayed() or not target.is_enabled(): raise BrowserBlocked('The observed control is no longer available')
                 if candidate['href'] and candidate['href'] not in ('#', 'javascript:void(0);', 'javascript:void(0)') and not candidate['href'].startswith('#'):
-                    from urllib.parse import urljoin
                     public_url(urljoin(observation['url'], candidate['href']))
                 value['phase'] = proposal['action']; persist()
-                if manager.driver_factory in (None, create_driver): reveal(driver, target)
+                verification = None
+                if manager.driver_factory in (None, create_driver): verification = reveal(driver, target, guard)
                 else: driver.execute_script('arguments[0].scrollIntoView({block:"center",behavior:"instant"})', target)
+                guard()
                 if proposal['action'] == 'click':
                     target.click(); triage('click', observation['url'], selector)
                     current['after'] = frame()
-                    if manager.driver_factory in (None, create_driver):
-                        from selenium.webdriver.support.ui import WebDriverWait
-                        WebDriverWait(driver, 6).until(lambda d: d.execute_script('return !document.getAnimations().some(a=>a.playState==="running" && a.effect && Number.isFinite(a.effect.getTiming().iterations))'))
-                action = {'action': proposal['action'], 'label': candidate['label']}; completed.append(action); current['actions'].append(action)
+                action = {'action': proposal['action'], 'candidate': candidate['id'], 'label': candidate['label']}; completed.append(action); current['actions'].append(action)
                 after = observe(driver)
-                if proposal['action'] == 'click' and after['url'] == observation['url'] and after['text'] == observation['text'] and after['facts'] == observation['facts'] and after['candidates'] == observation['candidates']:
-                    raise BrowserBlocked('The click produced no observable page change; no completion claimed')
+                if proposal['action'] == 'scroll' and verification is not None:
+                    action['verification'] = {'kind': 'stable-visible-reachable-target', 'geometry': verification}
+                if proposal['action'] == 'click':
+                    # A destination or this control's expanded state, never unrelated text/animation.
+                    def click_evidence(browser):
+                        guard()
+                        observed = observe(browser)
+                        now = next((c for c in observed['candidates'] if c['id'] == candidate['id']), None)
+                        href = candidate.get('href')
+                        destination = urljoin(observation['url'], href) if href else None
+                        return observed if (destination and destination != observation['url'] and observed['url'] == destination) or (now and now.get('expanded') != candidate.get('expanded') and now.get('expanded') in ('true', 'false')) else False
+                    from selenium.webdriver.support.ui import WebDriverWait
+                    try: after = WebDriverWait(driver, 6, poll_frequency=.25).until(click_evidence)
+                    except (InterruptedError, TimeoutError): raise
+                    except Exception: raise BrowserBlocked('The click produced no verified destination or control state change; no completion claimed')
+                    action['verification'] = {'kind': 'destination-or-expanded-control'}
                 current.update(result=('Clicked ' if proposal['action']=='click' else 'Found and scrolled to ') + candidate['label'], after=frame(), facts=after['facts'])
-                if 'read' in instruction.lower() and 'article' in instruction.lower():
-                    persist(); continue
-                current.update(state='verified', completedMs=value['frameTimesMs'][-1]); persist(); break
+                if simple_action_goal(instruction) and action_completed(instruction, completed):
+                    guard(); current.update(state='verified', completedMs=value['frameTimesMs'][-1]); persist(); break
+                persist(); continue
             else: raise BrowserBlocked('Coder could not complete this instruction within its action budget')
+        guard()
         value['status'] = 'passed'; value['verifiedResult'] = 'All instructed steps completed with recorded public-page evidence'
     except InterruptedError:
         value.update(status='cancelled', error='Cancelled', reason='Stopped by the user')
     except BrowserBlocked as exc:
         if hasattr(exc, 'proposal') and value['steps']: value['steps'][-1]['rejectedProposal'] = exc.proposal
         value.update(status='blocked', error='BrowserBlocked', reason=str(exc))
+        if value['steps']: value['steps'][-1]['failureReason'] = str(exc)
     except Exception as exc:
         value.update(status='failed', error=type(exc).__name__, reason='The browser/model operation failed. Captured evidence is retained; no success claimed.')
     finally:

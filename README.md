@@ -4,6 +4,23 @@ Help an SRE investigate an issue by understanding what they see in their browser
 
 ## Connected browser actions and recording
 
+**Standalone replay export:** the DAG inspector and recorded-run panel now offer
+**Export standalone Selenium .py**: a single-file deterministic synthetic browser
+workflow with embedded data, fixed Selenium operations, revision/evidence checks,
+explicit waits and a final visible assertion. It runs with Python + Selenium and
+an explicitly configured sandbox-enabled Grid, independently of this repository,
+UI, backend, triage and model. Legacy/incomplete traces and unsupported control
+flow are rejected at export. [Usage, security boundaries, supported operations,
+CLI and opt-in REAL clean-environment demo](docs/standalone-replay.md). New tests
+and demo are supplied; they have not been executed during this implementation.
+
+**Airflow fast replay:** the normal DAG inspector also provides explicit review
+and synthetic consent, immutable saved artifacts, manual run/status/results/logs
+and safe stop through the authenticated app proxy. Off by default; no model is
+used for ordinary replay. [Server setup, API/SDK dependencies, cancellation,
+verification and rollback](docs/airflow-replay.md). Unit/build/live acceptance
+have not been executed during this source-only integration.
+
 The **Run & Record** workspace now connects a saved DAG task to an approved Grid URL, a grounded local-Qwen proposal, a guarded Selenium click and a visible-result assertion. It records private before/after region frames and timestamped action provenance, supports cancellation/reusable triage export, and can export a clearly labelled action-frame WebM. No generated Python executes. [Setup, policy, API, real-vs-simulated evidence and infrastructure gate](docs/BROWSER_LOOP.md).
 
 The implementation is present; **real Grid deployment/browser acceptance is still blocked in this environment**. The existing LAN/static app is not silently upgraded. Operator setup uses `kubectl apply -k deploy/` to include the private test fixture without allowing browser egress.

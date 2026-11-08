@@ -1,0 +1,30 @@
+{
+  "localPython": {
+    "total": 286,
+    "passed": 281,
+    "skipped": 5,
+    "failed": 0
+  },
+  "frontend": {
+    "passed": 188
+  },
+  "build": "TypeScript/Vite passed; existing chunk advisory",
+  "browser": "Actual clean python -I exported artifact, two pages, two clicks, six verified steps, session quit, zero model calls. Actual new-source scroll stable/visible/already-visible/covered assertions passed. Existing operator-selected container isolation preserved.",
+  "liveAirflow": "Initial authenticated API 3.4.0/17 DAGs/no importErrors, before staging. Later connection denied [Errno 1] Operation not permitted, both direct vault client and app authenticated fast trigger returned unavailable. Mounted bundles are NOT live migration/discovery proof. No Airflow run ID or terminal worker success claimed.",
+  "productUI": "Actual Grid navigation to isolated authenticated app timed out; no fresh affected product-controls screenshot and no visual acceptance claimed. Synthetic DOM screenshots are not a substitute.",
+  "ownerPreserved": {
+    "backendPid": 11490,
+    "journeySha256": "df798a9d202653a2afddf4291b65be80b6d2bde3a51ba213b4638b179cbfa930",
+    "scrollRun": "4cdec59cd0eb4145946013899fe47602 passed; idle checked; no owner service modifications"
+  },
+  "deployedArtifact": {
+    "id": "60ad61819b65e3dafb8a43b22d6a8a8e8fee36913e66cf097ece46db7e04de06",
+    "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
+    "tasks": [
+      "show-errors",
+      "open-details"
+    ],
+    "createdAt": 1794104195
+  },
+  "gap": "Airflow loaded source/import/task/terminal/cancellation evidence, app browser-controls visual evidence, external changed-fixture replay and expanded actual negatives remain open. Integration defaults off; no production/private/autoscheduled run, email, model reload or policy changes."
+}
