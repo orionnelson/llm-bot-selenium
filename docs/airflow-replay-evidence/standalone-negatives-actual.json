@@ -1,0 +1,32 @@
+{
+  "kind": "actual clean exported artifacts; stale locator/target fault injection, NOT external fixture mutation",
+  "results": [
+    {
+      "case": "missing-locator",
+      "sourceSha256": "75bb8c7f6716917ecd8ee2339b395cc1943d24e5059704e80dead6c9e54cfbf1",
+      "revision": "370a77ac454ca7884362e90cabe05253be6b2d5ad67eb702ff7374527d261e01",
+      "returncode": 2,
+      "stdout": "REPLAY_RESULT {\"task\": \"show-errors\", \"step\": 1, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 2, \"state\": \"failed\", \"reason\": \"explicit wait or visible assertion timed out\"}\n",
+      "stderr": "FAIL show-errors/step-2: explicit wait or visible assertion timed out\n",
+      "modelCalls": 0
+    },
+    {
+      "case": "wrong-target",
+      "sourceSha256": "7a15ae74af29c40a7958748037abfaa480dc17bebdf044e0d0eb142b1bcd695c",
+      "revision": "67ced1121c371b44b84eeecfb7850588340fa40cda3349fc9a785217ca41757a",
+      "returncode": 2,
+      "stdout": "REPLAY_RESULT {\"task\": \"show-errors\", \"step\": 1, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 2, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 3, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 4, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"open-details\", \"step\": 1, \"state\": \"failed\", \"reason\": \"control identity changed\"}\n",
+      "stderr": "FAIL open-details/step-1: control identity changed\n",
+      "modelCalls": 0
+    },
+    {
+      "case": "reviewed-replacement",
+      "sourceSha256": "cdeb6c02e222e78b76c55dd42d500f857cdeae9901d092d7b655c591381df394",
+      "revision": "44063e6f49bae2cc4b20a397f4bccae2ed56725f60e5fce67e28939d6f9494ce",
+      "returncode": 0,
+      "stdout": "REPLAY_RESULT {\"task\": \"show-errors\", \"step\": 1, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 2, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 3, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 4, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"open-details\", \"step\": 1, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"open-details\", \"step\": 2, \"state\": \"passed\"}\nPASS standalone Selenium replay (visible result verified; session quit)\n",
+      "stderr": "",
+      "modelCalls": 0
+    }
+  ]
+}

@@ -90,11 +90,18 @@ Run `conf` is always `{}` and is never read by the worker.
 
 Each generated DAG has `schedule=None`, `catchup=False`,
 `is_paused_upon_creation=True`, `max_active_runs=1`, `max_active_tasks=1`; its task
-has `retries=0`. A paused manually triggered run can stay queued, so the app
-temporarily unpauses **only the selected hash-named DAG** before submission and
-re-pauses it on terminal status reconciliation. It never changes unrelated DAGs.
-If the app is closed, the DAG remains schedule-less; reopen and refresh its run
-to reconcile and re-pause. An API error is not reported as successful scheduling.
+has `retries=0`. Submission uses Airflow3.4 `drain_dag: true` for the selected
+manual run; Airflow drains it and re-pauses automatically. Terminal app status
+reconciliation also explicitly restores its paused state. The app does not issue
+an unpause patch and never changes unrelated DAGs. An API error is not reported
+as successful scheduling.
+
+The November11 live failure-path test confirmed exact-source discovery and
+terminal re-pausing, but the worker lacked `selenium`. The app now reports that
+fixed, sanitized startup reason. Install `selenium==4.51.0` in the actual worker
+Python environment through the operator's normal image/deployment process;
+installing it only in the editor/gateway venv is insufficient. No per-replay pip
+installation or model call is performed. See [current live evidence and blockers](AIRFLOW_REPLAY_2026-11-11.md).
 
 `flock` plus an fsynced active-run journal serializes app operations and survives
 restarts. An Airflow query additionally rejects queued/running runs for the selected

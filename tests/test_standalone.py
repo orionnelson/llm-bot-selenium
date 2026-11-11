@@ -26,6 +26,18 @@ REV = 'a' * 64
 
 
 class ExportTests(unittest.TestCase):
+    def test_clean_environment_missing_selenium_has_structured_startup_failure(self):
+        with tempfile.TemporaryDirectory() as root:
+            script = Path(root) / 'workflow.py'
+            script.write_text(export_python(demo_dag(*URLS), REV, URLS))
+            result = subprocess.run([sys.executable, '-I', '-S', str(script), '--grid', 'http://grid:4444'],
+                                    capture_output=True, text=True, timeout=10)
+        self.assertEqual(result.returncode, 2)
+        rows = [json.loads(line[14:]) for line in result.stdout.splitlines() if line.startswith('REPLAY_RESULT ')]
+        self.assertEqual(rows, [{'task': 'startup', 'step': 0, 'state': 'failed',
+                                'reason': 'Selenium dependency unavailable in replay environment'}])
+        self.assertNotIn('Traceback', result.stderr)
+
     def test_dependencies_determine_order_even_with_scrambled_storage(self):
         dag = demo_dag(*URLS)
         scrambled = replace(dag, tasks=tuple(reversed(dag.tasks)))
@@ -147,8 +159,9 @@ class ReplayElement:
         self.driver.clicks.append(self.identity)
         if self.identity == 'open-details': self.driver.current_url = DETAILS
         else: self.driver.shown = True
-    def clear(self): self.driver.inputs.append('clear')
-    def send_keys(self, value): self.driver.inputs.append(value)
+    def clear(self): self.driver.inputs.append('clear'); self.driver.input_value = ''
+    def send_keys(self, value): self.driver.inputs.append(value); self.driver.input_value = value
+    def get_property(self, name): return getattr(self.driver, 'input_value', '') if name == 'value' else None
 
 
 class ReplayDriver:
@@ -270,6 +283,21 @@ class RuntimeUnitTests(unittest.TestCase):
         with self.assertRaisesRegex(ReplayFailure, 'already satisfied; no click sent'):
             run(export_spec(demo_dag(*URLS), REV, URLS), 'http://grid:4444', driver_factory=lambda *args: d)
         self.assertNotIn('show-result', d.clicks)
+        self.assertEqual(d.quits, 1)
+
+
+    def test_input_noop_fails_without_exposing_value_unit_only(self):
+        spec = export_spec(demo_dag(*URLS), REV, URLS)
+        spec['tasks'][1]['steps'].insert(0, action('input', DETAILS, DETAILS, id='filter', env='SRE_REPLAY_INPUT_FILTER'))
+        d = ReplayDriver(); original = d.find_elements
+        def targets(*args):
+            found = original(*args)
+            for e in found: e.send_keys = lambda value: None
+            return found
+        d.find_elements = targets
+        with patch.dict(os.environ, {'SRE_REPLAY_INPUT_FILTER':'synthetic-filter'}), self.assertRaisesRegex(ReplayFailure, 'input value not retained') as error:
+            run(spec, 'http://grid:4444', driver_factory=lambda *args: d)
+        self.assertNotIn('synthetic-filter', str(error.exception))
         self.assertEqual(d.quits, 1)
 
 

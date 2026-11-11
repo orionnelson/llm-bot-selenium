@@ -172,6 +172,24 @@ class RegistryTests(unittest.TestCase):
                 self.assertEqual(request(port, 'POST', json.dumps({'confirmed': True}), headers, route+'/'+artifact['id']+'/run')[0], 202)
                 self.assertEqual(request(port, path=route+'/'+artifact['id']+'/status')[1]['state'], 'queued')
 
+    def test_missing_worker_dependency_reaches_sanitized_app_logs(self):
+        value = self.save()
+        run = self.registry.start(value['id'])
+        self.http.state = 'failed'
+        original = self.client.request
+        def request(method, path, body=None):
+            if path.endswith('/xcomEntries/replay_result'):
+                return {'value': {'steps': [{'task': 'startup', 'step': 0, 'state': 'failed',
+                        'reason': 'Selenium dependency unavailable in replay environment', 'raw': 'SECRET'}]}}
+            return original(method, path, body)
+        with patch.object(self.client, 'request', side_effect=request):
+            result = self.registry.status(value['id'])
+        self.assertEqual(result['state'], 'failed')
+        self.assertEqual(result['runId'], run['runId'])
+        logs = self.registry.logs(value['id'])['logs']
+        self.assertEqual(logs, ['startup/step-0: failed · Selenium dependency unavailable in replay environment'])
+        self.assertNotIn('SECRET', json.dumps(result))
+
     def test_transport_exception_and_provider_secrets_are_sanitized(self):
         def broken(*args):
             raise RuntimeError('password=SERVER_SECRET response body')
@@ -189,6 +207,16 @@ class WorkerTests(unittest.TestCase):
         sdk.get_current_context = lambda: {'run_id': 'replay__unit', 'ti': ti}
         return patch.dict(sys.modules, {'airflow': types.ModuleType('airflow'), 'airflow.sdk': sdk})
 
+    def test_child_startup_crash_is_visible_without_forwarding_raw_output(self):
+        values = []
+        with self.sdk(lambda *a, **k: 'false', values):
+            with self.assertRaisesRegex(RuntimeError, 'stopped or failed'):
+                execute_replay('import sys; print("SECRET", file=sys.stderr); sys.exit(2)',
+                               CONFIG['grid'], 'edge', 'browser', 'a'*64)
+        self.assertEqual(values[0]['steps'], [{'task': 'startup', 'step': 0, 'state': 'failed',
+                          'reason': 'replay process exited before first browser step'}])
+        self.assertNotIn('SECRET', json.dumps(values))
+
     def test_prestart_stop_does_not_create_subprocess(self):
         values = []
         with self.sdk(lambda *a, **k: 'true', values), patch('subprocess.Popen') as start:
@@ -196,6 +224,16 @@ class WorkerTests(unittest.TestCase):
                 execute_replay('invalid executable', CONFIG['grid'], 'edge', 'browser', 'a'*64)
             start.assert_not_called()
         self.assertEqual(values[0]['state'], 'stopped')
+
+    def test_signal_during_prestart_read_never_launches_child(self):
+        import signal
+        handlers = {}
+        def install(sig, fn): handlers[sig] = fn; return signal.SIG_DFL
+        def get(*args, **kwargs): handlers[signal.SIGTERM](); return 'false'
+        with self.sdk(get, []), patch('signal.signal', side_effect=install), patch('subprocess.Popen') as start:
+            with self.assertRaisesRegex(RuntimeError, 'before browser'):
+                execute_replay('invalid', CONFIG['grid'], 'edge', 'browser', 'a'*64)
+            start.assert_not_called()
 
     def test_running_stop_sigterms_child_and_waits_for_cleanup_unit_only(self):
         values, polls = [], [0]

@@ -51,6 +51,8 @@ def execute_replay(source, grid, browser, isolation, artifact_id):
         if Variable.get(prefix + 'requested', default='false') == 'true':
             context['ti'].xcom_push(key='replay_result', value={'artifactId': artifact_id, 'state': 'stopped', 'steps': []})
             raise RuntimeError('Synthetic replay stopped before browser startup')
+        if stopping:
+            raise RuntimeError('Synthetic replay stopped before browser startup')
         with tempfile.TemporaryDirectory(prefix='sre-replay-') as root:
             script, output = root + '/replay.py', root + '/output'
             with open(script, 'x', encoding='utf-8') as stream:
@@ -59,7 +61,11 @@ def execute_replay(source, grid, browser, isolation, artifact_id):
             env = {k: v for k, v in os.environ.items() if k in ('PATH', 'HOME', 'LANG', 'SSL_CERT_FILE', 'SSL_CERT_DIR') or k.startswith('SRE_REPLAY_INPUT_')}
             env['SELENIUM_ISOLATION_MODE'] = isolation
             with open(output, 'wb') as stream:
+                if stopping:
+                    raise RuntimeError('Synthetic replay stopped before browser startup')
                 process = subprocess.Popen([sys.executable, '-I', script, '--grid', grid, '--browser', browser], stdout=stream, stderr=stream, env=env)
+                if stopping:
+                    terminate()
                 deadline = time.monotonic() + 330
                 while process.poll() is None:
                     requested = Variable.get(prefix + str(int(time.time()) // 60), default='false')
@@ -74,6 +80,9 @@ def execute_replay(source, grid, browser, isolation, artifact_id):
                         break
                     time.sleep(2)
             results = collect(output)
+            if not results and process.returncode != 0 and not stopping:
+                results = [{'task': 'startup', 'step': 0, 'state': 'failed',
+                            'reason': 'replay process exited before first browser step'}]
             value = {'artifactId': artifact_id, 'state': 'stopped' if stopping else ('success' if process.returncode == 0 else 'failed'), 'steps': results}
             context['ti'].xcom_push(key='replay_result', value=value)
             print('REPLAY_SUMMARY ' + json.dumps(value), flush=True)

@@ -1,0 +1,35 @@
+{
+  "kind": "actual authenticated app to Airflow terminal failure; not successful browser acceptance",
+  "artifactId": "e69ea99a94d04b821e1c6afd55ffba131fe3a39acae5f7580a46dda00312d8b8",
+  "run": {
+    "httpStatus": 200,
+    "result": {
+      "artifactId": "e69ea99a94d04b821e1c6afd55ffba131fe3a39acae5f7580a46dda00312d8b8",
+      "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
+      "runId": "replay__469c47da93cb4327b27275128b8e19f5",
+      "state": "failed",
+      "tasks": [
+        {
+          "task_id": "replay_chain",
+          "state": "failed",
+          "try_number": 1
+        }
+      ],
+      "steps": []
+    }
+  },
+  "pausedAfter": true,
+  "loadedSourceMatchesMounted": true,
+  "loadedTaskIds": [
+    "replay_chain"
+  ],
+  "hasImportErrors": false,
+  "workerSummary": {
+    "state": "failed",
+    "steps": []
+  },
+  "diagnosis": "Child exited before emitting a browser-step event; missing worker Selenium dependency is a hypothesis, not established by this run.",
+  "productScreenshot": "BLOCKED: fresh actual Edge navigation to isolated authenticated Studio timed out; owned session quit",
+  "noProductionOrPrivateRun": true,
+  "modelCalls": 0
+}

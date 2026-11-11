@@ -1,30 +1,33 @@
 {
   "localPython": {
-    "total": 286,
-    "passed": 281,
+    "total": 292,
+    "passed": 287,
     "skipped": 5,
     "failed": 0
   },
   "frontend": {
-    "passed": 188
+    "passed": 189
   },
   "build": "TypeScript/Vite passed; existing chunk advisory",
-  "browser": "Actual clean python -I exported artifact, two pages, two clicks, six verified steps, session quit, zero model calls. Actual new-source scroll stable/visible/already-visible/covered assertions passed. Existing operator-selected container isolation preserved.",
-  "liveAirflow": "Initial authenticated API 3.4.0/17 DAGs/no importErrors, before staging. Later connection denied [Errno 1] Operation not permitted, both direct vault client and app authenticated fast trigger returned unavailable. Mounted bundles are NOT live migration/discovery proof. No Airflow run ID or terminal worker success claimed.",
+  "browser": "Actual clean python -I exported artifact, two pages, two clicks, six verified steps, session quit, zero model calls. Actual new-source scroll stable/visible/already-visible/covered assertions passed. Existing operator-selected container isolation preserved. Final-runtime clean rerun passed after review corrections. Actual stale-locator fault and wrong-target identity fault failed visibly, then reviewed replacement export passed; this was fault-injected artifact expectation, not external fixture mutation.",
+  "liveAirflow": "Real exact-source manual DAG discovery passed. Final-source app-triggered run replay__41d60960af9348118e3c61a3ad6bc9c2 reached actual failed task/try1, with structured worker/XCom/app diagnosis: Selenium dependency unavailable in replay environment. DAG re-paused. Separate run replay__bda9b82c3cd248b28e1ce614be99f866 accepted app Stop and worker rejected before browser startup; XCom stopped and actual terminal failed/paused. No successful Airflow browser run or running-browser cancellation claim.",
   "productUI": "Actual Grid navigation to isolated authenticated app timed out; no fresh affected product-controls screenshot and no visual acceptance claimed. Synthetic DOM screenshots are not a substitute.",
-  "ownerPreserved": {
-    "backendPid": 11490,
-    "journeySha256": "df798a9d202653a2afddf4291b65be80b6d2bde3a51ba213b4638b179cbfa930",
-    "scrollRun": "4cdec59cd0eb4145946013899fe47602 passed; idle checked; no owner service modifications"
-  },
   "deployedArtifact": {
-    "id": "60ad61819b65e3dafb8a43b22d6a8a8e8fee36913e66cf097ece46db7e04de06",
+    "id": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825",
     "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
     "tasks": [
       "show-errors",
       "open-details"
     ],
-    "createdAt": 1794104195
+    "createdAt": 1794428228
   },
-  "gap": "Airflow loaded source/import/task/terminal/cancellation evidence, app browser-controls visual evidence, external changed-fixture replay and expanded actual negatives remain open. Integration defaults off; no production/private/autoscheduled run, email, model reload or policy changes."
+  "gap": "Install Selenium in actual Airflow worker image/environment, then successful app-Airflow-browser-app terminal replay, running-browser stop/cleanup and fresh affected-controls screenshot; whole UC1/UC2/Studio acceptance and handoff remain open.",
+  "sourceReview": "Separate local reviewer found duplicate DOM target, pre-start cancellation race, input no-op, stale UI consent issues. Fixed with focused regressions; no independent visual acceptance or second-review approval claimed.",
+  "geometryEvidence": "Real scroll geometry captured before later dispatch-boundary hardening; unchanged reveal function only. Final dispatch boundary has unit evidence, not fresh product capture.",
+  "ownerPreservedHistorical": {
+    "backendPid": 11490,
+    "journeySha256": "df798a9d202653a2afddf4291b65be80b6d2bde3a51ba213b4638b179cbfa930",
+    "scrollRun": "4cdec59cd0eb4145946013899fe47602 passed; idle checked; no owner service modifications"
+  },
+  "ownerPreservedNow": "No owner services/processes or saved state were modified in the November11 run. Historical PID is not a current liveness assertion."
 }

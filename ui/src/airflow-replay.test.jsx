@@ -23,3 +23,12 @@ it('allows only hash-bound replay routes through the existing authenticated Bun 
  for(const path of ['/api/airflow/credentials','/api/airflow/artifacts/../../run','/api/airflow/artifacts/not-a-hash/run',`/api/airflow/artifacts/${id}/delete`,`/api/airflow/artifacts/${id}/run?code=evil`])expect(routes.test(path),path).toBe(false);
  expect(source.indexOf('timingSafeEqual(supplied,expected)')).toBeLessThan(source.indexOf('if(!api.test(url.pathname))'));
 });
+
+
+it('binds review approval to canonical data, recordings and exact fetched revision',()=>{
+ const source=readFileSync(new URL('./AirflowReplay.tsx',import.meta.url),'utf8');
+ expect(source).toContain('JSON.stringify([workflow,runIds])');
+ expect(source).toContain('approval?.key===reviewKey');
+ expect(source).toContain('approval?.revision!==saved.revision');
+ expect(source).toContain('setApproval(null);setSynthetic(false)');
+});

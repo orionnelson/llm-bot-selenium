@@ -1,0 +1,51 @@
+{
+  "artifactId": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825",
+  "trigger": {
+    "httpStatus": 202,
+    "result": {
+      "artifactId": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825",
+      "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
+      "runId": "replay__bda9b82c3cd248b28e1ce614be99f866",
+      "state": "queued"
+    }
+  },
+  "stop": {
+    "httpStatus": 202,
+    "result": {
+      "artifactId": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825",
+      "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
+      "runId": "replay__bda9b82c3cd248b28e1ce614be99f866",
+      "state": "stopping",
+      "stopRequested": true,
+      "stopSignalsWritten": true
+    }
+  },
+  "terminal": {
+    "httpStatus": 200,
+    "result": {
+      "artifactId": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825",
+      "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
+      "runId": "replay__bda9b82c3cd248b28e1ce614be99f866",
+      "state": "failed",
+      "stopRequested": true,
+      "stopSignalsWritten": true,
+      "tasks": [
+        {
+          "task_id": "replay_chain",
+          "state": "failed",
+          "try_number": 1
+        }
+      ],
+      "steps": []
+    }
+  },
+  "pausedAfter": true,
+  "workerRejectedBeforeBrowserStartup": true,
+  "stopRequested": true,
+  "workerXCom": {
+    "state": "stopped",
+    "steps": [],
+    "artifactId": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825"
+  },
+  "workerException": "Synthetic replay stopped before browser startup"
+}

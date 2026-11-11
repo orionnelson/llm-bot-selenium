@@ -1,6 +1,6 @@
 {
   "kind": "actual Selenium Grid / isolated exported Python artifact",
-  "sourceSha256": "c515bd82fb79901e9fa443e9d3e31cfb15030f29b9ad1695be26cee2d19a35ed",
+  "sourceSha256": "5d2b9907d231d44c17f92fca613c68eeed5e90f6891ee787f1d4e79d02561d9e",
   "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
   "returncode": 0,
   "stdout": "REPLAY_RESULT {\"task\": \"show-errors\", \"step\": 1, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 2, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 3, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"show-errors\", \"step\": 4, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"open-details\", \"step\": 1, \"state\": \"passed\"}\nREPLAY_RESULT {\"task\": \"open-details\", \"step\": 2, \"state\": \"passed\"}\nPASS standalone Selenium replay (visible result verified; session quit)\n",

@@ -113,3 +113,15 @@ class ActionCompletionTests(unittest.TestCase):
             def execute_script(self, *args): return None
         def cancelled(): raise InterruptedError('Cancelled')
         with self.assertRaises(InterruptedError): reveal(Browser(), object(), cancelled)
+
+
+    def test_duplicate_or_private_dispatch_target_is_rejected(self):
+        from triage.journey import resolve_target
+        class Browser:
+            def __init__(self, count, metadata): self.count, self.metadata = count, metadata
+            def find_elements(self, *args): return [object()] * self.count
+            def execute_script(self, *args): return self.metadata
+        candidate = {'id':'c0','label':'News','href':'/news','kind':'control','tag':'a'}
+        for browser in [Browser(2, candidate), Browser(1, None), Browser(1, dict(candidate, tag='button'))]:
+            with self.subTest(browser=browser), self.assertRaises(BrowserBlocked): resolve_target(browser, candidate)
+        self.assertIsNotNone(resolve_target(Browser(1, candidate), candidate))

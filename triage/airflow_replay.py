@@ -266,7 +266,7 @@ class ReplayRegistry:
             task, step = row.get('task'), row.get('step')
             if isinstance(task, str) and type(step) is int and ((task in limits and 1 <= step <= limits[task]) or (task == 'startup' and step == 0)) and row.get('state') in ('passed', 'failed'):
                 item = {'task': row['task'], 'step': row['step'], 'state': row['state']}
-                if row.get('reason') in {'explicit wait or visible assertion timed out', 'control identity changed', 'ambiguous locator', 'private/form boundary', 'click effect already satisfied; no click sent', 'browser operation failed', 'cancelled', 'sandbox verification unavailable', 'browser sandbox disabled', 'missing or invalid synthetic runtime input', 'URL assertion failed', 'task budget exceeded', 'run budget exceeded'}:
+                if row.get('reason') in {'explicit wait or visible assertion timed out', 'control identity changed', 'ambiguous locator', 'private/form boundary', 'click effect already satisfied; no click sent', 'browser operation failed', 'Selenium dependency unavailable in replay environment', 'replay process exited before first browser step', 'cancelled', 'sandbox verification unavailable', 'browser sandbox disabled', 'missing or invalid synthetic runtime input', 'URL assertion failed', 'task budget exceeded', 'run budget exceeded'}:
                     item['reason'] = row['reason']
                 result.append(item)
         return result

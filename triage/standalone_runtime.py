@@ -246,6 +246,7 @@ def run(spec, grid, browser='edge', driver_factory=None, isolation=None):
                         url(s['pre_url'])
                         e = wait_for(lambda: target(s), s['pre_url'])
                         e.send_keys(value)
+                        require(e.get_property('value') == value, 'synthetic input value not retained')
                 else:
                     wait_for(lambda: target(s), s['pre_url'])
                 ready(s['post_url'], s['pre_url'])
@@ -285,6 +286,10 @@ def main():
             require(bool(args.grid), 'configure SELENIUM_GRID_URL or --grid')
             run(SPEC, args.grid, args.browser)
     except Exception as error:
+        # Worker images may import Airflow successfully but lack Selenium in the isolated child.
+        if isinstance(error, ModuleNotFoundError) and (error.name == 'selenium' or (error.name or '').startswith('selenium.')):
+            print('REPLAY_RESULT ' + json.dumps({'task': 'startup', 'step': 0, 'state': 'failed',
+                  'reason': 'Selenium dependency unavailable in replay environment'}), flush=True)
         print('FAIL ' + (str(error) if type(error) is ReplayFailure else 'startup/step-0: dependency or configuration unavailable'), file=sys.stderr)
         return 2
     return 0

@@ -10,21 +10,25 @@ async function api(path:string, body?:unknown, revision?:string){
  const value=await response.json();if(!response.ok)throw Error(value.error||'Replay request failed');return value;
 }
 export default function AirflowReplay({workflow,runIds}:{workflow:Workflow;runIds:string[]}){
- const [artifacts,setArtifacts]=useState<Artifact[]>([]),[selected,setSelected]=useState(''),[reviewed,setReviewed]=useState(false),[synthetic,setSynthetic]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[configured,setConfigured]=useState(false),[state,setState]=useState<State>(),[logs,setLogs]=useState<string[]>([]);
+ const [artifacts,setArtifacts]=useState<Artifact[]>([]),[selected,setSelected]=useState(''),[approval,setApproval]=useState<{key:string;revision:string}|null>(null),[synthetic,setSynthetic]=useState(false),[busy,setBusy]=useState(false),[error,setError]=useState(''),[configured,setConfigured]=useState(false),[state,setState]=useState<State>(),[logs,setLogs]=useState<string[]>([]);
+ const reviewKey=JSON.stringify([workflow,runIds]);
+ const reviewed=approval?.key===reviewKey;
+ useEffect(()=>{setApproval(null);setSynthetic(false);},[reviewKey]);
  async function listing(){const value=await api('');setConfigured(value.configured===true);setArtifacts(value.artifacts);if(value.active){setSelected(value.active.artifactId);setState(value.active);}}
  useEffect(()=>{listing().catch(e=>setError(String(e)));},[]);
  async function action(fn:()=>Promise<void>){setBusy(true);setError('');try{await fn();}catch(e){setError(String(e));}finally{setBusy(false);}}
  async function save(){
   const saved=await loadDAG();
   if(JSON.stringify(buildDAG(workflow))!==JSON.stringify(buildDAG(fromDAG(saved.definition))))throw Error('Save the current DAG before reviewing its immutable replay snapshot.');
-  const value=await api('',{runIds,reviewed,synthetic},saved.revision);await listing();setSelected(value.id);setState(undefined);setReviewed(false);setSynthetic(false);
+  if(!reviewed||!synthetic||approval?.revision!==saved.revision){setApproval(null);throw Error('Snapshot changed; review and approve this revision again.');}
+  const value=await api('',{runIds,reviewed,synthetic},saved.revision);await listing();setSelected(value.id);setState(undefined);setApproval(null);setSynthetic(false);
  }
  async function refresh(){setState(await api('/'+selected+'/status'));setLogs((await api('/'+selected+'/logs')).logs);}
  const artifact=artifacts.find(a=>a.id===selected);
  return <section aria-label="Airflow fast replay">
   <h4>Airflow · deterministic fast replay</h4>
   <p>{configured?'Server configured. Ordinary replay uses no model and never reloads the current draft.':'Disabled / not configured. Server operator must enable Airflow replay.'}</p>
-  <label><input type="checkbox" checked={reviewed} onChange={e=>setReviewed(e.target.checked)}/>I reviewed the saved serial DAG and selected recorded steps.</label>
+  <label><input type="checkbox" checked={reviewed} onChange={e=>{if(!e.target.checked)setApproval(null);else action(async()=>{const saved=await loadDAG();setApproval({key:reviewKey,revision:saved.revision});});}}/>I reviewed the saved serial DAG and selected recorded steps.</label>
   <label><input type="checkbox" checked={synthetic} onChange={e=>setSynthetic(e.target.checked)}/>I approve synthetic-only replay of this snapshot.</label>
   <button disabled={!configured||busy||!reviewed||!synthetic} onClick={()=>action(save)}>Save reviewed immutable artifact</button>
   <button disabled={busy} onClick={()=>action(listing)}>Refresh saved artifacts / configuration</button>

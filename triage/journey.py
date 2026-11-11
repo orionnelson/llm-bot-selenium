@@ -28,7 +28,7 @@ window.__journeyCandidateCounter??=0;window.__journeyFactCounter??=0;
 const candidates=[];for(const e of document.querySelectorAll('a,button,summary,[role="button"],h1,h2,h3,h4')){
  if(!visible(e)||e.disabled)continue;const label=text(e,180);if(!label)continue;
  const id=e.getAttribute('data-journey-candidate')??('c'+window.__journeyCandidateCounter++);e.setAttribute('data-journey-candidate',id);
- candidates.push({id,label,kind:/^H[1-4]$/.test(e.tagName)?'heading':'control',href:e.tagName==='A'?e.getAttribute('href'):null,expanded:e.getAttribute('aria-expanded')});if(candidates.length>=100)break;
+ candidates.push({id,label,tag:e.tagName.toLowerCase(),kind:/^H[1-4]$/.test(e.tagName)?'heading':'control',href:e.tagName==='A'?e.getAttribute('href'):null,expanded:e.getAttribute('aria-expanded')});if(candidates.length>=100)break;
 }
 const facts=[];for(const e of document.querySelectorAll('span,p,small,strong,b')){if(!visible(e))continue;const t=text(e,100);if(!/^\d+\s+articles?$/i.test(t))continue;
  const root=e.closest('a')??e.parentElement;const context=text(root,350);const label=context.replace(t,'').trim();if(label&&!facts.some(f=>f.label===label)){const id=root.getAttribute('data-journey-fact')??('f'+window.__journeyFactCounter++);root.setAttribute('data-journey-fact',id);facts.push({id,label,count:parseInt(t,10),text:context});}if(facts.length>=20)break;
@@ -194,6 +194,17 @@ def reveal(driver, target, guard=lambda: None):
     except Exception: raise BrowserBlocked('The page is still covering or moving the requested control. No forced click or successful step claimed.')
 
 
+def resolve_target(driver, candidate):
+    selector = '[data-journey-candidate="' + candidate['id'] + '"]'
+    found = driver.find_elements('css selector', selector)
+    if len(found) != 1: raise BrowserBlocked('Ambiguous or missing target; no action sent')
+    target = found[0]
+    actual = driver.execute_script("const e=arguments[0];if(e.closest('input,textarea,select,form,[contenteditable],[data-private]')||e.form||e.querySelector('input,textarea,select,form,[contenteditable],[data-private]')||(e.tagName==='BUTTON'&&e.type!=='button'))return null;return {tag:e.tagName.toLowerCase(),label:(e.innerText||'').replace(/\\s+/g,' ').trim().slice(0,180),href:e.tagName==='A'?e.getAttribute('href'):null,kind:/^H[1-4]$/.test(e.tagName)?'heading':'control'};", target)
+    if not actual or any(actual.get(k) != candidate.get(k) for k in ('label', 'href', 'kind', 'tag')):
+        raise BrowserBlocked('Target identity or private/form boundary changed; no action sent')
+    return target
+
+
 def run_journey(manager, folder, value, event):
     driver = guard_network = None; started = time.monotonic()
     def guard():
@@ -282,7 +293,7 @@ def run_journey(manager, folder, value, event):
                 now = next((c for c in fresh['candidates'] if c['id'] == candidate['id']), None)
                 if fresh['url'] != observation['url'] or now != candidate: raise BrowserBlocked('The observed control changed while the coder was planning')
                 selector = '[data-journey-candidate="' + candidate['id'] + '"]'
-                target = driver.find_element('css selector', selector)
+                target = resolve_target(driver, candidate) if manager.driver_factory in (None, create_driver) else driver.find_element('css selector', selector)
                 if not target.is_displayed() or not target.is_enabled(): raise BrowserBlocked('The observed control is no longer available')
                 if candidate['href'] and candidate['href'] not in ('#', 'javascript:void(0);', 'javascript:void(0)') and not candidate['href'].startswith('#'):
                     public_url(urljoin(observation['url'], candidate['href']))
@@ -291,6 +302,8 @@ def run_journey(manager, folder, value, event):
                 if manager.driver_factory in (None, create_driver): verification = reveal(driver, target, guard)
                 else: driver.execute_script('arguments[0].scrollIntoView({block:"center",behavior:"instant"})', target)
                 guard()
+                if manager.driver_factory in (None, create_driver) and resolve_target(driver, candidate) != target:
+                    raise BrowserBlocked('Target replaced during reveal; no action sent')
                 if proposal['action'] == 'click':
                     target.click(); triage('click', observation['url'], selector)
                     current['after'] = frame()
