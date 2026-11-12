@@ -1,0 +1,89 @@
+{
+  "scenario": "Normal authenticated Studio Record control, owner five instructions, actual public Allenfort journey",
+  "browser": "Microsoft Edge 155.0.4283.45",
+  "viewports": {
+    "terminal_desktop": [
+      1600,
+      1200
+    ],
+    "step_controls": [
+      1440,
+      1100
+    ],
+    "mobile": [
+      430,
+      932
+    ]
+  },
+  "source_sha256": "41c730e1ea67af09ffafb5fe13a8d8bc8a210ae10b1e56fea1f59cdda8cea4e6",
+  "frontend_bundle": "index-6i1lRLWs.js",
+  "run_id": "f8fff0719f844836a734a7b3bc3da5cb",
+  "terminal_status": "passed",
+  "rendered_terminal_status": "passed",
+  "verified_clicks": [
+    {
+      "action": "click",
+      "candidate": "c3",
+      "label": "Services",
+      "url": "https://allenfort.ca/",
+      "afterUrl": "https://allenfort.ca/#services",
+      "verification": {
+        "kind": "observed-page-change",
+        "changed": [
+          "url"
+        ]
+      }
+    },
+    {
+      "action": "click",
+      "candidate": "c4",
+      "label": "Contact",
+      "url": "https://allenfort.ca/#services",
+      "afterUrl": "https://allenfort.ca/#contact",
+      "verification": {
+        "kind": "observed-page-change",
+        "changed": [
+          "url"
+        ]
+      }
+    }
+  ],
+  "steps": [
+    {
+      "label": "Open allenfort.ca",
+      "state": "verified"
+    },
+    {
+      "label": "Inspect the homepage",
+      "state": "verified"
+    },
+    {
+      "label": "screenshot its title and main visible content.",
+      "state": "verified"
+    },
+    {
+      "label": "Click on Services",
+      "state": "verified"
+    },
+    {
+      "label": "What Services doe Allenfort offer",
+      "state": "verified"
+    },
+    {
+      "label": "Click On Contact",
+      "state": "verified"
+    },
+    {
+      "label": "What is the contact Email for Allenfort",
+      "state": "verified"
+    }
+  ],
+  "model_calls": 6,
+  "recorded_frames": 8,
+  "canonical_unchanged": true,
+  "prior_recordings_preserved": true,
+  "controller_session_closed": true,
+  "existing_isolation": "container; unchanged",
+  "authentication": "origin-scoped CDP challenge using existing app credentials; no global auth header or auth bypass",
+  "boundary": "Actual deployed Studio hotfix, NOT exact PR61 Airflow-controls or real-worker acceptance"
+}
