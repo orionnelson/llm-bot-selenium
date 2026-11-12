@@ -99,17 +99,26 @@ def simple_action_goal(instruction):
     return bool(re.match(r'^(?:please\s+)?(?:click|open|go to|navigate|hover|scroll|find)\s+', instruction, re.I)) and not re.search(r'\b(?:read|inspect|screenshot|capture|check|count)\b', instruction, re.I)
 
 
-def action_completed(instruction, actions):
+def action_target(instruction):
     request = re.match(r'^(?:please\s+)?(click|open|go to|navigate(?: to)?|hover(?: over)?|scroll(?: to)?|find)\s+(.+)', instruction, re.I)
-    if not request: return True
+    if not request: return None
     verb, target = request.groups()
     required = 'hover' if verb.lower().startswith('hover') else 'scroll' if verb.lower().startswith(('scroll', 'find')) else 'click'
+    if verb.lower() == 'click':
+        target = re.sub(r'^on\s+', '', target, count=1, flags=re.I)
     target = re.split(r"\b(?:do not|don't|never|but not)\b", target, maxsplit=1, flags=re.I)[0]
     target = re.split(r'\s+(?:sideways\b|(?:on|at|in)\s+(?:the\s+)?(?:right|left|top|bottom|middle|center|side|screen)\b)', target, maxsplit=1, flags=re.I)[0]
     if required == 'scroll':
         # Direction/pacing before 'to' describes movement, not the destination label.
         target = re.sub(r'^(?:(?:up|down|dow|upwards|downwards|slowly|quickly)\b.*?)?to\s+', '', target, flags=re.I)
     target = re.split(r'\s+(?:to|so that|in order to)\s+', target, maxsplit=1, flags=re.I)[0]
+    return required, target
+
+
+def action_completed(instruction, actions):
+    request = action_target(instruction)
+    if not request: return True
+    required, target = request
     words = set(re.findall(r'[a-z0-9]+', target.lower())) - {'the','a','an','over','to','button','link','menu','section','dropdown','please','tab','page','item','option','control','up','down'}
     # Relative targets need page context; explicit control names must match the dispatched label.
     relative = bool(words & {'first','last','latest','recent','next','previous','article','articles'})
@@ -128,6 +137,12 @@ def click_target(instruction, observation, selected=None):
     direct = bool(re.match(r'^(?:please\s+)?(?:click|open|go to|navigate(?: to)?)\s+', instruction, re.I))
     candidates = [c for c in observation['candidates'] if c['kind'] == 'control' and click_matches(instruction, c)]
     if direct:
+        # Prefer the named control, not a broader label such as Our Services.
+        # Duplicate exact labels still fail the existing uniqueness check.
+        label_key = lambda value: re.sub(r'\s+', ' ', value).strip(' \t\r\n,;.').casefold()
+        requested = action_target(instruction)
+        exact = [c for c in candidates if label_key(c['label']) == label_key(requested[1])]
+        if exact: candidates = exact
         if not candidates: raise BrowserBlocked('The requested click target is not observed. No unrelated control clicked.')
         if len(candidates) != 1: raise BrowserBlocked('The requested click target is ambiguous. Name a unique control; no click sent.')
     if selected is not None:
@@ -143,13 +158,13 @@ def click_target(instruction, observation, selected=None):
 def propose_step(instruction, observation):
     # Constrain generated source to one fresh, observed operation, not free-form Python.
     evidence = observation['evidence']
-    click_target(instruction, observation)
+    click_candidates = click_target(instruction, observation)
     reading = 'read' in instruction.lower() and 'article' in instruction.lower()
     methods = ['read_articles'] if reading and observation.get('articles') else [] if reading else ['observe', 'screenshot']
     sources = ['def run(browser):\n    browser.' + method + '(' + json.dumps(evidence) + ')' for method in methods]
     if not reading or not observation.get('articles'):
         for candidate in observation['candidates']:
-            choices = ['scroll'] + (['click'] if candidate['kind'] == 'control' and click_matches(instruction, candidate) and not DANGEROUS.search(candidate['label']) else [])
+            choices = ['scroll'] + (['click'] if candidate in click_candidates and not DANGEROUS.search(candidate['label']) else [])
             for action in choices:
                 sources.append('def run(browser):\n    browser.' + action + '(' + json.dumps(candidate['id']) + ', ' + json.dumps(evidence) + ')')
     if not sources: raise BrowserBlocked('No observed safe operation can satisfy this instruction')
