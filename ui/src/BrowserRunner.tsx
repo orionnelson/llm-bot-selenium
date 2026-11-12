@@ -3,6 +3,7 @@ import { loadDAG } from './backend';
 import { useGrid } from './grid-state';
 import { useStudio } from './store';
 import BrowserPolicyEditor from './BrowserPolicyEditor';
+import StandaloneExport from './StandaloneExport';
 import type { TaskSpec } from './dag';
 import { activeRun, browserRun, cancelBrowserRun, recordingAsset, startBrowserRun } from './browser';
 function download(value:unknown,name:string){const url=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));const a=document.createElement('a');a.href=url;a.download=name;a.click();URL.revokeObjectURL(url);}
@@ -11,7 +12,7 @@ export default function BrowserRunner({nodeId}:{nodeId:string}){
  const {run,history,status:grid,error:connectionError,setRun}=useGrid();
  const draft=useStudio(s=>s.workflow.nodes.find(n=>n.id===nodeId));
  const replay=useStudio(s=>s.mode==='Replay');
- const dirty=!!saved&&JSON.stringify([draft?.data.config.target,draft?.data.config.prompt,draft?.data.config.browser])!==JSON.stringify([saved.task.params.target,saved.task.params.prompt,saved.task.params.browser]);
+  const dirty=!!saved&&JSON.stringify([draft?.data.config.target,draft?.data.config.prompt,draft?.data.config.browser,draft?.data.config.replay_capture])!==JSON.stringify([saved.task.params.target,saved.task.params.prompt,saved.task.params.browser,saved.task.params.replay_capture]);
  const readOnly=(saved?.task.params.browser as {mode?:string})?.mode==='read-only-or9';
  const ready=grid?.grid.ready&&grid.grid.edgeAvailable;
  const approved=!!saved&&!!grid?.approvedUrls.includes(String(saved.task.params.target));
@@ -40,6 +41,7 @@ export default function BrowserRunner({nodeId}:{nodeId:string}){
  {step&&<pre>{JSON.stringify({action:step.action,locator:step.locator,evidence:step.evidence,state:step.state},null,2)}</pre>}
  {run.video&&<><p>Action-frame replay · one second per captured frame, not wall-clock screen video.</p><video ref={player} className="browser-run-frame" controls src={recordingAsset(run.video.url)}/></>}
  <div className="python-buttons"><button disabled={activeRun(run)} onClick={()=>download(run,run.id+'-recording.json')}>Export recording</button><button disabled={activeRun(run)||!run.triage.events.length} onClick={()=>download(run.triage,run.id+'-triage.json')}>Export reusable triage session</button></div></section>}
- <h4>Private recordings</h4>{history.map(r=><button key={r.id} onClick={()=>{setRun(r);setSelected(0);}}>{r.startedAt} · {r.taskId} · {r.status}</button>)}
+  {run&&<StandaloneExport revision={saved?.revision} runIds={[run.id]}/>}
+  <h4>Private recordings</h4>{history.map(r=><button key={r.id} onClick={()=>{setRun(r);setSelected(0);}}>{r.startedAt} · {r.taskId} · {r.status}</button>)}
  </div>;
 }

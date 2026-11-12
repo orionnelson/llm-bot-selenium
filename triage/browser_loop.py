@@ -181,7 +181,10 @@ class BrowserRuns:
     def read(self, run_id):
         if not RUN_ID.fullmatch(run_id):
             raise BrowserBlocked('Invalid recording ID')
-        value = json.loads((self.root / run_id / 'manifest.json').read_text())
+        path = self.root / run_id / 'manifest.json'
+        if path.stat().st_size > 1_000_000:
+            raise BrowserBlocked('Recording manifest exceeds bounds')
+        value = json.loads(path.read_text())
         with self.lock:
             event = self.active.get(run_id)
         if value['status'] not in TERMINAL:
@@ -206,6 +209,14 @@ class BrowserRuns:
         if task is None:
             raise BrowserBlocked('Saved browser task required')
         config = task_config(task, self.urls)
+        approval = task.params.get('replay_capture')
+        replay_approved = isinstance(approval, dict) and set(approval) == {'synthetic'} and approval['synthetic'] is True
+        if replay_approved:
+            from .standalone_runtime import validate_step
+            from .standalone import action
+            if config[2].get('mode'):
+                raise BrowserBlocked('Replay capture requires annotated synthetic fixture controls')
+            validate_step(action('assert_text', config[0], config[0], **config[2]['expected']), self.urls)
         if not os.environ.get('SELENIUM_GRID_URL'):
             raise OSError('Grid is not configured')
         if not grid_status(os.environ['SELENIUM_GRID_URL'])['ready']:
@@ -225,7 +236,7 @@ class BrowserRuns:
                 folder.mkdir(mode=0o700)
                 value = {'version': 'browser-run/v1', 'id': run_id, 'taskId': node_id, 'revision': revision,
                          'startedAt': datetime.now(timezone.utc).isoformat(), 'url': config[0], 'goal': config[1], 'policy': config[2], 'status': 'queued',
-                         'model': MODEL, 'modelCalls': 0, 'evidenceKind': self.evidence_kind, 'frames': [], 'frameTimesMs': [], 'steps': [],
+                          'model': MODEL, 'modelCalls': 0, 'evidenceKind': self.evidence_kind, 'replayApproved': replay_approved, 'frames': [], 'frameTimesMs': [], 'steps': [],
                          'triage': {'version': 'triage-session/v1', 'id': 'browser-' + run_id, 'mode': 'recorded',
                                     'provenance': 'imported', 'url': config[0], 'events': []}}
                 save(folder, value)
@@ -239,6 +250,22 @@ class BrowserRuns:
 
     def run(self, folder, value, config, event, video):
         driver, started = None, time.monotonic()
+        from .standalone import action
+        from .standalone_runtime import BOUNDARY
+        # The approval is copied at start from the canonical saved task, never model output.
+        task_capture = value.get('replayApproved') is True
+        def replay_ready(expected_url):
+            from selenium.webdriver.support.ui import WebDriverWait
+            def ready(d):
+                guard()
+                if len(d.window_handles) != 1 or d.execute_script('return window.top === window.self') is not True:
+                    raise BrowserBlocked('Replay capture supports only one top-level window; recapture without frame/window actions')
+                if safe_url(d.current_url) not in self.urls:
+                    raise BrowserBlocked('Replay capture escaped approved URLs')
+                roots = d.find_elements('css selector', '[data-sre-observe]')
+                if len(roots) > 1: raise BrowserBlocked('Ambiguous replay region')
+                return d.current_url == expected_url and d.execute_script('return document.readyState') == 'complete' and len(roots) == 1 and roots[0].is_displayed() and d.execute_script("return !arguments[0].closest('form,input,textarea,select,[contenteditable],[data-private]')", roots[0]) is True
+            WebDriverWait(driver, 10, poll_frequency=.1).until(ready)
         def guard():
             if event.is_set(): raise InterruptedError('Cancelled')
             if time.monotonic() - started > 300: raise TimeoutError('Browser budget exceeded')
@@ -268,6 +295,10 @@ class BrowserRuns:
                 value['status'] = 'passed'
                 value['verifiedResult'] = 'Approved or9.ca homepage has a title and visible body'
                 return
+            if task_capture:
+                replay_ready(config[0])
+                value['replay'] = {'version': 'sre-capture/v1', 'synthetic': True, 'context': 'top-single-window',
+                                   'initial': action('navigate', config[0], config[0], url=config[0])}
             observation = observe(driver, config[2], self.urls)
             frame(); triage('navigate', observation['url']); save(folder, value)
             for _ in range(config[2]['max_steps']):
@@ -287,6 +318,12 @@ class BrowserRuns:
                 elements = driver.find_elements('css selector', '[data-sre-observe] ' + locator)
                 if len(elements) != 1 or not elements[0].is_displayed() or not elements[0].is_enabled() or elements[0].tag_name != c['tag'] or elements[0].get_attribute('data-sre-safe') != 'true' or elements[0].get_attribute('data-sre-action') != c['id'] or elements[0].get_attribute('aria-disabled') == 'true' or (c['href'] is not None and elements[0].get_attribute('href') != c['href']):
                     raise BrowserBlocked('Action target is stale or ambiguous')
+                if task_capture:
+                    replay_ready(current['url'])
+                    global_targets = driver.find_elements('css selector', locator)
+                    roots = driver.find_elements('css selector', '[data-sre-observe]')
+                    if len(global_targets) != 1 or len(roots) != 1 or driver.execute_script(BOUNDARY, roots[0], elements[0], False) is not True or (c['tag'] == 'button' and elements[0].get_attribute('type') != 'button'):
+                        raise BrowserBlocked('Replay control requires unique safe non-form boundary and non-submit button')
                 step = {'id': 'step-' + str(len(value['steps'])), 'action': 'click', 'candidate': c['id'], 'label': c['label'],
                         'locator': locator, 'url': current['url'], 'evidence': proposal['evidence'], 'state': 'proposed',
                         'before': value['frames'][-1], 'videoMs': (len(value['frames'])-1)*1000,
@@ -294,13 +331,24 @@ class BrowserRuns:
                 value['steps'].append(step); save(folder, value)  # Intent is durable BEFORE any click.
                 guard(); elements[0].click()
                 step['state'] = 'performed'; save(folder, value)
+                if task_capture:
+                    replay_ready(safe_url(driver.current_url))
                 observation = observe(driver, config[2], self.urls)
                 step['after'] = frame(); step['afterUrl'] = observation['url']; step['state'] = 'verified'; step['completedMs'] = int((time.monotonic()-started)*1000)
+                if task_capture:
+                    step['replay'] = action('click', current['url'], observation['url'], id=c['id'], tag=c['tag'], href=c['href'])
                 triage('click', current['url'], locator)
                 if observation['url'] != current['url']: triage('navigate', observation['url'])
                 save(folder, value)
             guard()
             if observation['result'] == config[2]['expected']['text']:
+                if task_capture:
+                    replay_ready(observation['url'])
+                    roots = driver.find_elements('css selector', '[data-sre-observe]')
+                    results = driver.find_elements('css selector', '[data-sre-result="' + config[2]['expected']['id'] + '"]')
+                    if len(results) != 1 or not results[0].is_displayed() or driver.execute_script(BOUNDARY, roots[0], results[0], False) is not True or results[0].text != config[2]['expected']['text']:
+                        raise BrowserBlocked('Replay final visible result is ambiguous or private')
+                    value['replay']['final'] = action('assert_text', observation['url'], observation['url'], **config[2]['expected'])
                 value['status'] = 'passed'
                 value['verifiedResult'] = observation['result']
             else:

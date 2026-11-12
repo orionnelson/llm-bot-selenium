@@ -1,0 +1,68 @@
+{
+  "artifact": {
+    "id": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825",
+    "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
+    "tasks": [
+      "show-errors",
+      "open-details"
+    ],
+    "createdAt": 1794428228
+  },
+  "modelCalls": 0,
+  "discovery": {
+    "paused": true,
+    "schedule": null,
+    "hasImportErrors": false,
+    "tasks": [
+      "replay_chain"
+    ],
+    "sourceMatchesMounted": true
+  },
+  "trigger": {
+    "httpStatus": 202,
+    "result": {
+      "artifactId": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825",
+      "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
+      "runId": "replay__41d60960af9348118e3c61a3ad6bc9c2",
+      "state": "queued"
+    }
+  },
+  "terminal": {
+    "httpStatus": 200,
+    "result": {
+      "artifactId": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825",
+      "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
+      "runId": "replay__41d60960af9348118e3c61a3ad6bc9c2",
+      "state": "failed",
+      "tasks": [
+        {
+          "task_id": "replay_chain",
+          "state": "failed",
+          "try_number": 1
+        }
+      ],
+      "steps": [
+        {
+          "task": "startup",
+          "step": 0,
+          "state": "failed",
+          "reason": "Selenium dependency unavailable in replay environment"
+        }
+      ]
+    }
+  },
+  "logs": {
+    "httpStatus": 200,
+    "result": {
+      "state": "failed",
+      "logs": [
+        "startup/step-0: failed \u00b7 Selenium dependency unavailable in replay environment"
+      ],
+      "notice": "Sanitized structured replay events only; refresh after completion for XCom results."
+    }
+  },
+  "pausedAfter": true,
+  "workerSummaries": [
+    "REPLAY_SUMMARY {\"artifactId\": \"c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825\", \"state\": \"failed\", \"steps\": [{\"task\": \"startup\", \"step\": 0, \"state\": \"failed\", \"reason\": \"Selenium dependency unavailable in replay environment\"}]}"
+  ]
+}

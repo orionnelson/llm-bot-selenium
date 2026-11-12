@@ -1,0 +1,14 @@
+{
+  "appAuthenticated": true,
+  "unauthenticated": 401,
+  "saveStatus": 201,
+  "artifact": {
+    "id": "c8c51c5bff3fd18d249986b245bd34256e7c5787f48d398930817c46c3114825",
+    "revision": "96b73aa704f58b969db339edddd293420fc9d929f8f8dfc774e6a775d12f1f70",
+    "tasks": [
+      "show-errors",
+      "open-details"
+    ],
+    "createdAt": 1794428228
+  }
+}

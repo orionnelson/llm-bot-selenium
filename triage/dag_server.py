@@ -25,11 +25,13 @@ def snapshot(path):
             'revision': hashlib.sha256(source).hexdigest()}
 
 
-def handler(dag_path, assets, *, test_mode=False, recordings=None):
+def handler(dag_path, assets, *, test_mode=False, recordings=None, airflow_replay=None):
     """One trusted server-side definition path; clients cannot select filesystem paths."""
     dag_lock, generation_lock = Lock(), Lock()
     from .browser_loop import BrowserRuns
     browser_runs = BrowserRuns(recordings or dag_path.parent / 'browser-recordings', generation_lock, lambda: snapshot(dag_path)['revision']) if test_mode else None
+    from .airflow_replay import from_env
+    replay = airflow_replay if airflow_replay is not None else from_env()
     class Handler(SimpleHTTPRequestHandler):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, directory=str(assets), **kwargs)
@@ -66,6 +68,8 @@ def handler(dag_path, assets, *, test_mode=False, recordings=None):
         def do_GET(self):
             if not self.local_request():
                 return self.reply(403, {'error': 'Local same-origin requests only'})
+            if urlsplit(self.path).path.startswith('/api/airflow/'):
+                return self.airflow_request('GET')
             if urlsplit(self.path).path.startswith('/api/browser/runs'):
                 if not browser_runs:
                     return self.reply(503, {'error': 'Test browser execution disabled'})
@@ -121,6 +125,48 @@ def handler(dag_path, assets, *, test_mode=False, recordings=None):
             self.close_connection = True
             if not self.local_request():
                 return self.reply(403, {'error': 'Local same-origin requests only'})
+            if self.path.startswith('/api/airflow/'):
+                return self.airflow_request('POST')
+            if self.path == '/api/dag/export/selenium':
+                from .standalone_runtime import ReplayFailure
+                if self.headers.get_content_type() != 'application/json' or self.headers.get('Transfer-Encoding'):
+                    return self.reply(415, {'error': 'Send bounded application/json'})
+                try:
+                    size = int(self.headers.get('Content-Length', '0'))
+                    if not 0 < size <= 8192:
+                        return self.reply(413, {'error': 'Export request exceeds bounds'})
+                    payload = json.loads(self.rfile.read(size))
+                    if not isinstance(payload, dict) or set(payload) != {'runIds'} or not isinstance(payload['runIds'], list) or len(payload['runIds']) > 100 or any(not isinstance(i, str) for i in payload['runIds']) or len(set(payload['runIds'])) != len(payload['runIds']):
+                        return self.reply(400, {'error': 'Expected explicit unique completed run IDs'})
+                    from .standalone import export_python
+                    from .browser_loop import DEFAULT_URLS
+                    with dag_lock:
+                        current = snapshot(dag_path)
+                        if self.headers.get('If-Match') != current['revision']:
+                            return self.reply(409, {'error': 'DAG changed; reload saved revision before export'})
+                        if payload['runIds'] and not browser_runs:
+                            return self.reply(503, {'error': 'Recording store disabled; export reviewed saved replay data or enable test mode'})
+                        records = [browser_runs.read(i) for i in payload['runIds']]
+                        urls = json.loads(os.environ.get('SRE_BROWSER_URLS', json.dumps(DEFAULT_URLS)))
+                        source = export_python(DAG.from_spec(current['definition']), current['revision'], urls, records)
+                        if snapshot(dag_path)['revision'] != current['revision']:
+                            return self.reply(409, {'error': 'DAG changed during export; reload and regenerate'})
+                        body = source.encode('utf-8')
+                        if len(body) > LIMIT:
+                            return self.reply(413, {'error': 'Standalone export exceeds bounds'})
+                        self.send_response(200)
+                        self.send_header('Content-Type', 'text/x-python; charset=utf-8')
+                        self.send_header('Content-Disposition', 'attachment; filename="workflow_standalone.py"')
+                        self.send_header('Content-Length', str(len(body)))
+                        self.end_headers()
+                        self.wfile.write(body)
+                        return
+                except ReplayFailure as error:
+                    return self.reply(422, {'error': 'Export rejected: ' + str(error)})
+                except (ValueError, TypeError, KeyError, SyntaxError, RecursionError, AttributeError):
+                    return self.reply(400, {'error': 'Invalid saved DAG, recording or export configuration; reload or recapture'})
+                except OSError:
+                    return self.reply(503, {'error': 'Saved DAG or recording unavailable; no export produced'})
             if self.path == '/api/browser/journeys':
                 if not browser_runs: return self.reply(503, {'error': 'Browser execution disabled'})
                 if self.headers.get_content_type() != 'application/json' or self.headers.get('Transfer-Encoding'):
@@ -196,6 +242,58 @@ def handler(dag_path, assets, *, test_mode=False, recordings=None):
                 return self.reply(502, {'error': 'Test model unavailable or candidate invalid; no source applied/executed'})
             finally:
                 generation_lock.release()
+
+        def airflow_request(self, method):
+            if replay is None:
+                return self.reply(503, {'configured': False, 'error': 'Airflow replay disabled / not configured'})
+            from .airflow_replay import AirflowError
+            try:
+                if urlsplit(self.path).query:
+                    raise ValueError('Query parameters unsupported')
+                parts = self.path.strip('/').split('/')
+                if method == 'GET' and parts == ['api', 'airflow', 'artifacts']:
+                    return self.reply(200, replay.listing())
+                payload = None
+                if method == 'POST':
+                    if self.headers.get_content_type() != 'application/json' or self.headers.get('Transfer-Encoding'):
+                        return self.reply(415, {'error': 'Send bounded application/json'})
+                    size = int(self.headers.get('Content-Length', '0'))
+                    if not 0 < size <= 8192:
+                        return self.reply(413, {'error': 'Replay request exceeds bounds'})
+                    payload = json.loads(self.rfile.read(size))
+                if method == 'POST' and parts == ['api', 'airflow', 'artifacts']:
+                    if not isinstance(payload, dict) or set(payload) != {'runIds', 'reviewed', 'synthetic'} or payload['reviewed'] is not True or payload['synthetic'] is not True:
+                        raise ValueError('Explicit review and synthetic consent required')
+                    ids = payload['runIds']
+                    if not isinstance(ids, list) or len(ids) > 100 or any(not isinstance(i, str) for i in ids) or len(set(ids)) != len(ids):
+                        raise ValueError('Invalid recording selection')
+                    from .browser_loop import DEFAULT_URLS
+                    with dag_lock:
+                        current = snapshot(dag_path)
+                        if self.headers.get('If-Match') != current['revision']:
+                            return self.reply(409, {'error': 'Saved revision changed; reload and review'})
+                        if ids and not browser_runs:
+                            raise ValueError('Recording store unavailable')
+                        records = [browser_runs.read(i) for i in ids]
+                        urls = json.loads(os.environ.get('SRE_BROWSER_URLS', json.dumps(DEFAULT_URLS)))
+                        value = replay.save(DAG.from_spec(current['definition']), current['revision'], urls, records, revision_check=lambda: snapshot(dag_path)['revision'])
+                        return self.reply(201, value)
+                if len(parts) == 5 and parts[:3] == ['api', 'airflow', 'artifacts']:
+                    artifact_id, operation = parts[3:]
+                    if method == 'GET' and operation in ('status', 'tasks', 'logs'):
+                        value = replay.logs(artifact_id) if operation == 'logs' else replay.status(artifact_id)
+                        return self.reply(200, value)
+                    if method == 'POST' and operation in ('run', 'stop'):
+                        if payload != {'confirmed': True}:
+                            raise ValueError('Explicit confirmation required')
+                        return self.reply(202, replay.start(artifact_id) if operation == 'run' else replay.stop(artifact_id))
+                return self.reply(404, {'error': 'Unknown replay route'})
+            except AirflowError:
+                return self.reply(502, {'error': 'Airflow unavailable or request unresolved; refresh status before retrying'})
+            except (ValueError, TypeError, KeyError, SyntaxError, RecursionError, AttributeError):
+                return self.reply(409, {'error': 'Replay rejected: review consent, saved revision, serial synthetic steps, loaded bundle and active-run status'})
+            except OSError:
+                return self.reply(503, {'error': 'Replay registry or immutable bundle unavailable'})
 
         def do_PUT(self):
             with dag_lock:

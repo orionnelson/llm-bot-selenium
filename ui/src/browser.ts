@@ -11,4 +11,9 @@ export async function browserHistory():Promise<BrowserRun[]>{const value=await r
 export async function browserRun(id:string):Promise<BrowserRun>{return parseRun(await request('/api/browser/runs/'+validId(id)));}
 export async function startBrowserRun(nodeId:string,revision:string,consent:boolean,video:boolean):Promise<string>{const value=await request('/api/browser/runs',{method:'POST',headers:{'Content-Type':'application/json','If-Match':revision},body:JSON.stringify({nodeId,consent,video})});return validId(value.id);}
 export async function cancelBrowserRun(id:string){return request('/api/browser/runs/'+validId(id)+'/cancel',{method:'POST'});}
-
+export async function exportStandalone(revision:string,runIds:string[]):Promise<string>{
+ runIds.forEach(validId);
+ const response=await fetch('/api/dag/export/selenium',{method:'POST',cache:'no-store',signal:AbortSignal.timeout(10000),headers:{'Content-Type':'application/json','If-Match':revision},body:JSON.stringify({runIds})});
+ if(!response.ok){const body=await response.json();throw Error(body.error||'Standalone export rejected');}
+ return response.text();
+}

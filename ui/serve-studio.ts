@@ -12,7 +12,7 @@ const expected=Buffer.from('Basic '+Buffer.from('blue-lagoon:'+password).toStrin
 const origins=process.env.SRE_STUDIO_ORIGINS?.split(',');
 const hosts=['smol-kitten.local','smol-kitten','127.0.0.1','localhost','opencode-svc.llms.svc.cluster.local'];
 const mime:Record<string,string>={'.html':'text/html; charset=utf-8','.js':'text/javascript; charset=utf-8','.css':'text/css; charset=utf-8','.json':'application/json','.svg':'image/svg+xml'};
-const api=/^\/api\/(?:dag|test\/status|python\/generate|browser\/journeys|browser\/runs(?:\/[a-f0-9]{32}(?:\/(?:cancel|frame-\d{2}\.png|actions\.webm))?)?)$/;
+const api=/^\/api\/(?:dag(?:\/export\/selenium)?|airflow\/artifacts(?:\/[a-f0-9]{64}\/(?:run|status|tasks|logs|stop))?|test\/status|python\/generate|browser\/journeys|browser\/runs(?:\/[a-f0-9]{32}(?:\/(?:cancel|frame-\d{2}\.png|actions\.webm))?)?)$/;
 function unauthorized(){return new Response('Studio sign-in required',{status:401,headers:{'WWW-Authenticate':'Basic realm="Edge Grid Studio", charset="UTF-8"','Cache-Control':'no-store'}});}
 const server=Bun.serve({maxRequestBodySize:1000000,hostname:'0.0.0.0',port:Number(process.env.SRE_STUDIO_PORT||3002),async fetch(request:Request){
  const url=new URL(request.url);
@@ -41,4 +41,3 @@ const server=Bun.serve({maxRequestBodySize:1000000,hostname:'0.0.0.0',port:Numbe
  return new Response(request.method==='HEAD'?null:asset,{headers:{'Content-Type':mime[extname(file)]||'application/octet-stream','X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer','Cache-Control':'no-store','Content-Security-Policy':"default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'"}});
 }});
 console.log(`Authenticated Edge Grid Studio listening on ${server.port}`);
-

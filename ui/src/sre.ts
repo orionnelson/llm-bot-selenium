@@ -5,7 +5,7 @@ import { uid } from './workflow';
 import type { Node, Edge } from '@xyflow/react';
 export type Status = 'idle'|'queued'|'running'|'waiting'|'success'|'failed'|'skipped'|'cancelled'|'retrying';
 export type BrowserPolicy = {mode:'read-only-or9'} | {allowed_actions:string[];expected:{id:string;text:string};max_steps:number};
-export interface Config { browser?:BrowserPolicy; target: string; region: string; metrics: string[]; timeRange: string; method: string; screenshot: boolean; prompt: string; retries: number; timeout: number; condition?:Condition; python?:PythonCode; loop?:LoopConfig; loopOwner?:string; snippet?:Snippet }
+export interface Config { replay_capture?:{synthetic:true}; replay?:{version:'sre-replay-task/v1';synthetic:true;steps:Record<string,unknown>[]}; browser?:BrowserPolicy; target: string; region: string; metrics: string[]; timeRange: string; method: string; screenshot: boolean; prompt: string; retries: number; timeout: number; condition?:Condition; python?:PythonCode; loop?:LoopConfig; loopOwner?:string; snippet?:Snippet }
 export interface Action { id: string; title: string; icon: string; color: string; category: string; description: string }
 export const actions: Action[] = [
  ['lambda','Check Lambda Page','λ','orange','SRE Bot Actions','Inspect a Lambda function and extract operational metrics.'],
