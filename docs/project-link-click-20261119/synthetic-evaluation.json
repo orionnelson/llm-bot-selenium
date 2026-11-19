@@ -1,0 +1,10 @@
+{
+  "scope": "60 deterministic synthetic pairs, 15 held-out skill validations; not independent real-world incidents",
+  "cases": 60,
+  "diagnosis_matches": 60,
+  "healthy_counterexamples_correct": 60,
+  "cold_planner_calls": 281,
+  "warm_planner_calls": 0,
+  "cold_actions": 281,
+  "warm_actions": 180
+}

@@ -16,7 +16,7 @@ from .public_browser import public_url, PublicRequests
 from .test_codegen import complete
 from .browser_function import parse_function
 
-CODER = 'Qwen3-Coder-30B-A3B-Instruct-1M-Q4_K_M'
+CODER = 'Qwen3.6-35B-A3B-UD-Q4_K_M-no-think'
 # Never collect form values, editable/private text, passwords, cookies or page source.
 OBSERVE_PUBLIC = r"""
 const ignore='input,textarea,select,form,[contenteditable],[data-private],script,style,[hidden],[aria-hidden="true"]';
@@ -28,7 +28,7 @@ window.__journeyCandidateCounter??=0;window.__journeyFactCounter??=0;
 const candidates=[];for(const e of document.querySelectorAll('a,button,summary,[role="button"],h1,h2,h3,h4')){
  if(!visible(e)||e.disabled)continue;const label=text(e,180);if(!label)continue;
  const id=e.getAttribute('data-journey-candidate')??('c'+window.__journeyCandidateCounter++);e.setAttribute('data-journey-candidate',id);
- candidates.push({id,label,kind:/^H[1-4]$/.test(e.tagName)?'heading':'control',href:e.tagName==='A'?e.getAttribute('href'):null,expanded:e.getAttribute('aria-expanded')});if(candidates.length>=100)break;
+ candidates.push({id,label,kind:/^H[1-4]$/.test(e.tagName)?'heading':'control',href:e.tagName==='A'?e.getAttribute('href'):null,target:e.tagName==='A'?e.getAttribute('target'):null,expanded:e.getAttribute('aria-expanded')});if(candidates.length>=100)break;
 }
 const facts=[];for(const e of document.querySelectorAll('span,p,small,strong,b')){if(!visible(e))continue;const t=text(e,100);if(!/^\d+\s+articles?$/i.test(t))continue;
  const root=e.closest('a')??e.parentElement;const context=text(root,350);const label=context.replace(t,'').trim();if(label&&!facts.some(f=>f.label===label)){const id=root.getAttribute('data-journey-fact')??('f'+window.__journeyFactCounter++);root.setAttribute('data-journey-fact',id);facts.push({id,label,count:parseInt(t,10),text:context});}if(facts.length>=20)break;
@@ -116,6 +116,10 @@ def action_completed(instruction, actions):
     if not request: return True
     required, target = request
     words = set(re.findall(r'[a-z0-9]+', target.lower())) - {'the','a','an','over','to','button','link','menu','section','dropdown','please','tab','page','item','option','control','up','down'}
+    # Remove only the descriptive suffix, retaining any earlier identifying 'Project'.
+    if required == 'click' and len(words) > 2 and re.search(r'\bproject[.!?]*\s*$', target, re.I):
+        name = re.sub(r'\s+project[.!?]*\s*$', '', target, flags=re.I)
+        words.intersection_update(re.findall(r'[a-z0-9]+', name.lower()))
     # Relative targets need page context; explicit control names must match the dispatched label.
     relative = bool(words & {'first','last','latest','recent','next','previous','article','articles'})
     return any(a.get('action') == required and (relative or not words or words.issubset(set(re.findall(r'[a-z0-9]+', a.get('label','').lower())))) for a in actions)
@@ -205,6 +209,8 @@ def run_journey(manager, folder, value, event):
     driver = guard_network = None; started = time.monotonic()
     def guard():
         if event.is_set(): raise InterruptedError('Cancelled')
+        if guard_network is not None and getattr(guard_network, 'disconnected', False) is True:
+            raise BrowserBlocked('The mandatory browser request guard disconnected; no further action or completion claimed')
         if time.monotonic() - started > 900: raise TimeoutError('Journey exceeded its 15 minute budget')
     def persist(): save(folder, value)
     def frame():
@@ -294,17 +300,52 @@ def run_journey(manager, folder, value, event):
                 value['phase'] = proposal['action']; persist()
                 if manager.driver_factory in (None, create_driver): reveal(driver, target)
                 else: driver.execute_script('arguments[0].scrollIntoView({block:"center",behavior:"instant"})', target)
+                guard()  # Cancellation or guard loss during reveal must prevent dispatch.
+                previous_windows = set(driver.window_handles) if proposal['action'] == 'click' and hasattr(driver, 'window_handles') else None
+                followed_window = None
+                observed_windows = set()
+                expects_new_page = candidate.get('target', '').casefold() == '_blank' if candidate.get('target') else False
+                def check_click_windows(final=False):
+                    if previous_windows is None:
+                        return set()
+                    observed_windows.update(set(driver.window_handles) - previous_windows)
+                    if len(observed_windows) > 1:
+                        raise BrowserBlocked('The click opened multiple pages; no destination guessed or completion claimed')
+                    if final and observed_windows and followed_window not in observed_windows:
+                        raise BrowserBlocked('A new page opened during verification; no completion claimed')
+                    return observed_windows
                 if proposal['action'] == 'click':
                     target.click(); triage('click', observation['url'], selector)
-                    current['after'] = frame()
                     if manager.driver_factory in (None, create_driver):
                         from selenium.webdriver.support.ui import WebDriverWait
-                        WebDriverWait(driver, 6).until(lambda d: d.execute_script('return !document.getAnimations().some(a=>a.playState==="running" && a.effect && Number.isFinite(a.effect.getTiming().iterations))'))
-                action = {'action': proposal['action'], 'label': candidate['label']}; completed.append(action); current['actions'].append(action)
+                        def changed(browser):
+                            nonlocal followed_window
+                            guard()
+                            if previous_windows is not None:
+                                opened = check_click_windows()
+                                if opened and followed_window is None:
+                                    followed_window = next(iter(opened))
+                                    browser.switch_to.window(followed_window)
+                                    if guard_network is not None:
+                                        guard_network.wait_for_current_target(browser)
+                                if expects_new_page and followed_window is None:
+                                    return False
+                                if followed_window is not None and (browser.current_url in ('about:blank', 'data:,') or not browser.title.strip()):
+                                    return False
+                            fresh = observe(browser)
+                            return fresh if any(fresh.get(k) != observation.get(k) for k in ('url', 'text', 'facts', 'articles', 'candidates')) else False
+                        try: WebDriverWait(driver, 16, poll_frequency=.25).until(changed)
+                        except TimeoutException:
+                            raise BrowserBlocked('The ' + proposal['action'] + ' produced no observable page change; no completion claimed')
+                action = {'action': proposal['action'], 'label': candidate['label'], 'afterUrl': driver.current_url}; completed.append(action); current['actions'].append(action)
                 after = observe(driver)
+                check_click_windows(final=True)
+                if followed_window is not None: action['navigationContext'] = 'new-tab'
                 if proposal['action'] == 'click' and after['url'] == observation['url'] and after['text'] == observation['text'] and after['facts'] == observation['facts'] and after['candidates'] == observation['candidates']:
                     raise BrowserBlocked('The click produced no observable page change; no completion claimed')
                 current.update(result=('Clicked ' if proposal['action']=='click' else 'Found and scrolled to ') + candidate['label'], after=frame(), facts=after['facts'])
+                check_click_windows(final=True)
+                guard()
                 if 'read' in instruction.lower() and 'article' in instruction.lower():
                     persist(); continue
                 current.update(state='verified', completedMs=value['frameTimesMs'][-1]); persist(); break
