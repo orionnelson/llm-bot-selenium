@@ -1,0 +1,48 @@
+{
+  "authenticated_render": true,
+  "workflow_executed": false,
+  "saved": false,
+  "session_closed": true,
+  "isolation": {
+    "mode": "container",
+    "browserSandbox": false
+  },
+  "space_Code_selected": true,
+  "unexpected_demo_playing": false,
+  "state": "passed",
+  "native_controls": [
+    "Code",
+    "Outcomes",
+    "View",
+    "Before",
+    "After",
+    "Next step",
+    "Previous step",
+    "Play step replay",
+    "Pause step replay"
+  ],
+  "tab_navigation": [
+    "Home",
+    "ArrowRight",
+    "End",
+    "ArrowLeft"
+  ],
+  "ui_write_requests": [],
+  "canonical_unchanged": true,
+  "browser": "155.0.4283.45",
+  "viewport": {
+    "width": 1720,
+    "height": 1200
+  },
+  "ui_bundle": [
+    "http://opencode-svc.llms.svc.cluster.local:3002/assets/index-CxFsCvmb.js"
+  ],
+  "ui_index_sha256": "98899f4444ac1e9073eca7a0586aed6411274d577c08172716c23e71d638f97e",
+  "app_source_sha256": "d4c244f27d670db2aba69960681c467327bd4452326067274d2392be881ccf1e",
+  "screenshots": [
+    "space-code-tab.png",
+    "space-next-step-and-after.png",
+    "space-play-step-replay.png"
+  ],
+  "screenshotsNote": "Selected publication subset; raw capture directory also retains an earlier failed extra-summary probe and its error screenshot. No summary activation acceptance claimed."
+}

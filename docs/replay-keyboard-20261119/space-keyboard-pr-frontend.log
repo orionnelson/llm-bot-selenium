@@ -1,0 +1,36 @@
+
+> workflow-studio@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /var/lib/openclaw/.openclaw/workspace/projects/observability_browser_agent/space-keyboard-pr-20261119/ui
+
+ ✓ src/journey-proxy.test.js (1 test) 4ms
+ ✓ src/connection-layout.test.js (2 tests) 2ms
+ ✓ src/workflow.test.ts (39 tests) 37ms
+ ✓ src/dag.test.ts (8 tests) 26ms
+ ✓ src/python-artifacts.test.js (1 test) 42ms
+ ✓ src/browser-observation.test.js (16 tests) 168ms
+ ✓ src/reconnect.test.ts (3 tests) 10ms
+ ✓ src/python-recording.test.ts (8 tests) 17ms
+ ✓ src/sre.test.ts (10 tests) 16ms
+ ✓ src/connections.test.ts (8 tests) 26ms
+ ✓ src/control-snippets-layout.test.ts (28 tests) 32ms
+ ✓ src/dag-python.test.js (1 test) 109ms
+ ✓ src/grid-state.test.tsx (5 tests) 26ms
+ ✓ src/browser.test.js (2 tests) 154ms
+ ✓ src/python-revision.test.tsx (3 tests) 17ms
+ ✓ src/backend.test.js (8 tests) 202ms
+ ✓ src/journey-ui.test.jsx (4 tests) 137ms
+ ✓ src/workspace-render.test.tsx (5 tests) 25ms
+ ✓ src/reconnect-ui.test.tsx (4 tests) 39ms
+ ✓ src/keyboard-shortcuts.test.jsx (13 tests) 20ms
+ ✓ src/ui-review.test.tsx (5 tests) 29ms
+ ✓ src/observer-session.test.js (3 tests) 366ms
+ ✓ src/page-seed-cli.test.js (19 tests) 989ms
+
+ Test Files  23 passed (23)
+      Tests  196 passed (196)
+   Start at  14:10:24
+   Duration  1.48s (transform 1.46s, setup 0ms, collect 5.79s, tests 2.49s, environment 4ms, prepare 1.63s)
+

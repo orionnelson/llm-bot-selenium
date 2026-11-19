@@ -1,0 +1,39 @@
+
+> workflow-studio@0.1.0 test
+> vitest run
+
+
+ RUN  v3.2.7 /var/lib/openclaw/.openclaw/workspace/projects/observability_browser_agent/space-keyboard-owner-20261119/ui
+
+ ✓ src/browser-observation.test.js (16 tests) 118ms
+ ✓ src/workflow.test.ts (39 tests) 39ms
+ ✓ src/dag.test.ts (8 tests) 18ms
+ ✓ src/control-snippets-layout.test.ts (28 tests) 18ms
+ ✓ src/python-recording.test.ts (8 tests) 10ms
+ ✓ src/journey-projection-ui.test.tsx (3 tests) 9ms
+ ✓ src/reconnect.test.ts (3 tests) 13ms
+ ✓ src/python-artifacts.test.js (1 test) 44ms
+ ✓ src/sre.test.ts (10 tests) 18ms
+ ✓ src/connections.test.ts (8 tests) 17ms
+ ✓ src/grid-step-status.test.tsx (10 tests) 14ms
+ ✓ src/dag-python.test.js (2 tests) 173ms
+ ✓ src/browser.test.js (3 tests) 274ms
+ ✓ src/replay-styles.test.js (1 test) 14ms
+ ✓ src/backend.test.js (7 tests) 287ms
+ ✓ src/connection-layout.test.js (2 tests) 4ms
+ ✓ src/grid-session.test.tsx (1 test) 13ms
+ ✓ src/journey-recovery.test.tsx (4 tests) 23ms
+ ✓ src/step-controls.test.jsx (26 tests) 62ms
+ ✓ src/observer-session.test.js (3 tests) 481ms
+ ✓ src/workspace-render.test.tsx (5 tests) 43ms
+ ✓ src/reconnect-ui.test.tsx (4 tests) 40ms
+ ✓ src/grid-state.test.tsx (7 tests) 258ms
+ ✓ src/keyboard-shortcuts.test.jsx (13 tests) 30ms
+ ✓ src/recording-dag-ui.test.jsx (25 tests) 69ms
+ ✓ src/page-seed-cli.test.js (19 tests) 1153ms
+
+ Test Files  26 passed (26)
+      Tests  256 passed (256)
+   Start at  14:10:22
+   Duration  1.77s (transform 2.20s, setup 0ms, collect 9.10s, tests 3.24s, environment 5ms, prepare 2.90s)
+

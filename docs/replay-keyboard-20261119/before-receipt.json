@@ -1,0 +1,29 @@
+{
+  "authenticated_render": true,
+  "workflow_executed": false,
+  "saved": false,
+  "session_closed": true,
+  "isolation": {
+    "mode": "container",
+    "browserSandbox": false
+  },
+  "space_Code_selected": false,
+  "unexpected_demo_playing": false,
+  "state": "reproduced",
+  "ui_write_requests": [],
+  "canonical_unchanged": true,
+  "browser": "155.0.4283.45",
+  "viewport": {
+    "width": 1720,
+    "height": 1200
+  },
+  "ui_bundle": [
+    "http://opencode-svc.llms.svc.cluster.local:3002/assets/index-Bo2ZZklr.js"
+  ],
+  "ui_index_sha256": "8caef34b746848c6cb4b854e456ef46edee76e7afad1f3e007898939ce2afcff",
+  "app_source_sha256": "c91a9c012767c30a78cdf03e6fcf7861725bbe37b50e4d148a7f424f6010a465",
+  "screenshots": [
+    "space-code-tab.png"
+  ],
+  "screenshotsNote": "Selected publication subset; raw capture directory also retains an earlier failed extra-summary probe and its error screenshot. No summary activation acceptance claimed."
+}
