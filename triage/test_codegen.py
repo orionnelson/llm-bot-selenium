@@ -33,21 +33,23 @@ def wait_model(model_id, expected):
         time.sleep(1)  # Wait for an actual running-service transition, not a scheduled task.
 
 
-def complete(messages, *, max_tokens=1500, json_mode=False):
+def complete(messages, *, max_tokens=1500, json_mode=False, model=MODEL, schema=None):
     models = smol('/v1/models')['data']
-    if not any(m['id'] == MODEL for m in models):
-        raise ValueError('Configured Qwen3.6 model is unavailable')
+    if not any(m['id'] == model for m in models):
+        raise ValueError('Requested local model is unavailable')
     # Local operating rule: unload resident models, then explicitly load this single model.
-    for model in models:
-        if model.get('status', {}).get('value') != 'unloaded':
-            smol('/models/unload', {'model': model['id']})
-            wait_model(model['id'], 'unloaded')
-    smol('/models/load', {'model': MODEL})
-    wait_model(MODEL, 'loaded')
-    payload = {'model': MODEL, 'temperature': 0, 'max_tokens': max_tokens, 'messages': messages}
-    if json_mode: payload['response_format'] = {'type': 'json_object'}
+    for entry in models:
+        if entry.get('status', {}).get('value') != 'unloaded':
+            smol('/models/unload', {'model': entry['id']})
+            wait_model(entry['id'], 'unloaded')
+    smol('/models/load', {'model': model})
+    wait_model(model, 'loaded')
+    payload = {'model': model, 'temperature': 0, 'max_tokens': max_tokens, 'messages': messages}
+    if schema is not None:
+        payload['response_format'] = {'type': 'json_schema', 'json_schema': {'name': 'browser_function', 'strict': True, 'schema': schema}}
+    elif json_mode: payload['response_format'] = {'type': 'json_object'}
     result = smol('/v1/chat/completions', payload)
-    if result.get('model') != MODEL:
+    if result.get('model') != model:
         raise ValueError('Unexpected model response; no fallback accepted')
     choice = result['choices'][0]
     if choice.get('finish_reason') != 'stop':

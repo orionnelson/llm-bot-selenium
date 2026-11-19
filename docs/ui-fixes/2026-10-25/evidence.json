@@ -1,0 +1,165 @@
+{
+  "sourceBundle": "assets/index-w2BAl_Pb.js",
+  "bundleSha256": "4bd9e7e1c8c27d2cab34c0a061875e602f5433d96918b6eb2bc0324ad2ba5c0a",
+  "mode": "after",
+  "browser": "MicrosoftEdge",
+  "browserVersion": "155.0.4283.45",
+  "scenario": "synthetic templates, normal UI controls; no Save/model/workflow execution",
+  "checks": {
+    "selectedLibraryTabs": [
+      "Components"
+    ],
+    "nodeTitleScreenPixels": 13.999999671349158,
+    "desktopFullNamesUnclamped": true,
+    "keyboardTabs": true,
+    "selectedWireHighlight": true,
+    "wireDisconnectUndo": true,
+    "draftSavedSourcesExplicit": true,
+    "inspectorHeight": 420,
+    "pythonEditorHeight": 220,
+    "inspectorToggle": true,
+    "importGuidanceSingleColumn": true,
+    "jsonImportWorked": true,
+    "loopReturnBelowCards": true,
+    "loopReturnLabelInsideCanvas": true,
+    "snippetDesignerOpens": true,
+    "snippetClipSaved": true,
+    "demoHistoryVisible": true,
+    "demoHistoryReplay": true,
+    "addRemoveInstruction": true,
+    "tabletNoPageOverflow": true,
+    "tabletCompleteTopology": true,
+    "helpOutsideViewport": true,
+    "tabletInspectorInsideCenter": true,
+    "phoneNoPageOverflow": true,
+    "phoneCompleteTopology": true,
+    "phoneFooterFollowsSession": true,
+    "canonicalWorkflowUnchanged": true,
+    "pageErrors": [],
+    "resizeObserverWarnings": [],
+    "fatalPageErrors": []
+  },
+  "screenshots": [
+    {
+      "name": "01-workspace",
+      "selector": ".app",
+      "capture": "actual element crop",
+      "sha256": "7fd488d4fb1b2fb07e3db85ddb2f0f868472363df817bcd65f60afa4b782b671"
+    },
+    {
+      "name": "02-library",
+      "selector": ".sidebar",
+      "capture": "actual element crop",
+      "sha256": "4b055ee9b1ad5e34cb98fc9f4c0212f6973e72dc8cd6b4b971252693c5e77afb"
+    },
+    {
+      "name": "03-canvas",
+      "selector": "section.center",
+      "capture": "actual element crop",
+      "sha256": "70c7730a146f5789a1357497fd60e421aa4b1eacfd26514acf76f602662ec34f"
+    },
+    {
+      "name": "04-wire-selected",
+      "selector": "section.center",
+      "capture": "actual element crop",
+      "sha256": "47d00ebc71ebe675523113a958db12cb87f9253b1c252bed4981708f5c1a43e0"
+    },
+    {
+      "name": "05-wire-disconnected",
+      "selector": "section.center",
+      "capture": "actual element crop",
+      "sha256": "5c4261a3a9964466cb258fa97583ad1e86971a3ed45c91a3b68eb7f03cd7fdfa"
+    },
+    {
+      "name": "05b-draft-versus-saved",
+      "selector": ".modal",
+      "capture": "actual element crop",
+      "sha256": "bbdd5fa4b4d2913677fddd2da9b89751c2de45f89bc45b0dd6558673e4f4ff09"
+    },
+    {
+      "name": "06-python-inspector",
+      "selector": ".inspector",
+      "capture": "actual element crop",
+      "sha256": "7afd525a4b9727e06f9119506caa10d4cd5acb71fadabf5e09ca084aa33f59ce"
+    },
+    {
+      "name": "07-task-dag",
+      "selector": ".inspector",
+      "capture": "actual element crop",
+      "sha256": "62c9dcd9690d4a8764d2112c7793d4abf33601348357867ad768ce65479df613"
+    },
+    {
+      "name": "08-dag-dialog",
+      "selector": ".modal",
+      "capture": "actual element crop",
+      "sha256": "810fc0eb4f5ddff7533ac1cef4e02f4f1341ef06f955c61b10d17555ea410689"
+    },
+    {
+      "name": "08b-import-controls",
+      "selector": ".statusbar",
+      "capture": "actual element crop",
+      "sha256": "ee8cb4eb7178c8905aaee2d2bd75f4e4f69e4b51a40beb39319d66484d85ab95"
+    },
+    {
+      "name": "09-control-flow",
+      "selector": "section.center",
+      "capture": "actual element crop",
+      "sha256": "f3cc64ce19cb68742e1ee4e09752d951991f39cce82922b56be0f070ec542c7f"
+    },
+    {
+      "name": "10-contextual-empty",
+      "selector": ".inspector",
+      "capture": "actual element crop",
+      "sha256": "941e2dcdc23ab7c340db5a9f737e9dda2d7246ef4371dac294063311be623821"
+    },
+    {
+      "name": "11-triage-empty",
+      "selector": ".modal",
+      "capture": "actual element crop",
+      "sha256": "d0eabb5b6f5ddce13d7e46e46789a4df0f0119737af07d72ac59bb7a4a4c8d21"
+    },
+    {
+      "name": "11b-triage-snippet-saved",
+      "selector": ".modal .snippet-item",
+      "capture": "actual element crop",
+      "sha256": "3a59d3160ab1476f5e95c83ef7e48f238094a1a6f2336fab2f466563b615615a"
+    },
+    {
+      "name": "12-demo-history",
+      "selector": ".modal",
+      "capture": "actual element crop",
+      "sha256": "0cb358b52b3c837fe7a939634813a6a8a9a14a987952529cad7bdcc64478aacb"
+    },
+    {
+      "name": "12b-demo-history-result",
+      "selector": ".modal",
+      "capture": "actual element crop",
+      "sha256": "153275970688e8e867f0ccbe9b41dcdef4032e0d5dab7900d81a782e94181268"
+    },
+    {
+      "name": "13-instructions-add-step",
+      "selector": ".inspector",
+      "capture": "actual element crop",
+      "sha256": "c2b0d60e34ec62dc78a397592c9b9357e8e43b03d15aaf999726a464bb9fda0f"
+    },
+    {
+      "name": "14-session-empty",
+      "selector": ".right.session-only",
+      "capture": "actual element crop",
+      "sha256": "f099688cecc89c06a23ec15ad11cd70c4b2b8bbfc4974d17b71487108f422f38"
+    },
+    {
+      "name": "15-tablet-workspace",
+      "selector": ".app",
+      "capture": "actual element crop",
+      "sha256": "aac052383f7ed6b68b9e65e88f0e8ad4d727fb39ca74a64f8416a12ff1a98cbc"
+    },
+    {
+      "name": "16-phone-workspace",
+      "selector": ".app",
+      "capture": "full component via CDP beyond viewport",
+      "sha256": "602c11f59b0c9c7d6f44158491fd244d1e3f146468ca1aaecb90e643958146f5"
+    }
+  ],
+  "sessionClosed": true
+}

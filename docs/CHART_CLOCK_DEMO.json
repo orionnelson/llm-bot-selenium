@@ -1,0 +1,192 @@
+{
+  "source_base": "8587b8abdf4c15498f1d0478db771c06aa4944ec",
+  "chart_checks_sha256": "30557b43fac037476d0dc8a7ac3638cc966d852f0e7ce870f591d59ba7f2ac9e",
+  "transport": "actual loopback HTTP/Selenium waits; fake DOM and synthetic invalid clock inputs",
+  "browser_model_video": "NOT RUN",
+  "observer_actions": [
+    "navigate",
+    "shortcut-open-chart"
+  ],
+  "clock_rejections": [
+    {
+      "input": "boolean",
+      "conversion_rejected": true,
+      "direct": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "independent": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "bot_not_navigated": true
+    },
+    {
+      "input": "float",
+      "conversion_rejected": true,
+      "direct": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "independent": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "bot_not_navigated": true
+    },
+    {
+      "input": "string",
+      "conversion_rejected": true,
+      "direct": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "independent": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "bot_not_navigated": true
+    },
+    {
+      "input": "missing",
+      "conversion_rejected": true,
+      "direct": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "independent": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "bot_not_navigated": true
+    },
+    {
+      "input": "nan",
+      "conversion_rejected": true,
+      "direct": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "independent": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "bot_not_navigated": true
+    },
+    {
+      "input": "infinity",
+      "conversion_rejected": true,
+      "direct": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "independent": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "bot_not_navigated": true
+    },
+    {
+      "input": "negative",
+      "conversion_rejected": true,
+      "direct": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "independent": {
+        "state": "unknown",
+        "evidence": "observed-last",
+        "uncertainty": "nonnegative integer evaluation clock required"
+      },
+      "bot_not_navigated": true
+    }
+  ],
+  "fresh_independent": {
+    "observed": {
+      "state": "healthy",
+      "evidence": "observed-last",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause"
+    },
+    "conclusion": {
+      "state": "failure",
+      "evidence": "fresh-bot",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause"
+    },
+    "route": "entity-chart"
+  },
+  "same_check_release": [
+    {
+      "at": 100,
+      "state": "failure",
+      "evidence": "tick-100",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 400,
+      "state": "failure",
+      "evidence": "tick-400",
+      "value": 8,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": true,
+      "recovery": false,
+      "report": false
+    },
+    {
+      "at": 700,
+      "state": "healthy",
+      "evidence": "tick-700",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": true,
+      "report": true
+    },
+    {
+      "at": 1000,
+      "state": "unknown",
+      "evidence": "tick-1000",
+      "uncertainty": "chart loading or missing",
+      "duplicate": false,
+      "recovery": false,
+      "report": true
+    },
+    {
+      "at": 1300,
+      "state": "healthy",
+      "evidence": "tick-1300",
+      "value": 0,
+      "maximum": 1,
+      "uncertainty": "numeric chart condition only; not root cause",
+      "duplicate": false,
+      "recovery": true,
+      "report": true
+    }
+  ],
+  "cadence": 300,
+  "bounded_end": true,
+  "observer_unchanged": true
+}

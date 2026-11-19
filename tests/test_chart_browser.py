@@ -1,17 +1,21 @@
 """Real loopback HTTP + fake DOM, NOT rendered browser or model acceptance."""
-from dataclasses import replace
+from dataclasses import asdict, replace
+import json
+from urllib.error import HTTPError
+from urllib.parse import urlencode
+from urllib.request import urlopen
 import importlib.util
 import threading
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 from uuid import uuid4
 
-from triage.chart_browser import SeleniumChartPort
+from triage.chart_browser import SeleniumChartPort, binding_from_data
 from triage.chart_checks import (ChartBinding, ChartView, SyntheticObserver, ChartCheck,
                                  investigate_chart, ReleasePlan, ReleaseMonitor)
 from triage.core import Action, Context, GuardError
 from triage.mock_server import make_server
-from test_selenium_contract import FakeHTTPDriver
+from test_selenium_contract import FakeHTTPDriver, Element
 
 
 @unittest.skipUnless(importlib.util.find_spec('selenium'), 'Selenium package required')
@@ -46,6 +50,492 @@ class ChartDOMTests(unittest.TestCase):
         check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=self.now)
         return issue, check
 
+    def test_large_explicit_threshold_survives_http_journey_without_relaxing_dom_budget(self):
+        issue, _ = self.issue()
+        huge = 10 ** 400
+        check = ChartCheck.from_issue(issue, huge, sre_validated=True, now=100)
+        self.value = 8
+        result = investigate_chart(issue, check, self.bot, now=100)
+        self.assertEqual(result['conclusion']['state'], 'healthy')
+        self.assertEqual(result['conclusion']['maximum'], huge)
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertEqual(monitor.tick(100, self.bot)['state'], 'healthy')
+        # The existing DOM text budget still rejects giant page values.
+        self.now, self.value = 400, huge
+        self.assertEqual(monitor.tick(400, self.bot)['state'], 'unknown')
+        self.now, self.value = 700, 0
+        self.assertTrue(monitor.tick(700, self.bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, self.bot))
+        self.assertTrue(monitor.stopped)
+        self.assertIs(monitor.plan.check, check)
+
+    def test_expiry_with_invalid_reference_stops_same_observed_release_check(self):
+        issue, check = self.issue()
+        self.changes = {'evidence_id': 'https://private.invalid/token', 'session_valid': False}
+        independent = investigate_chart(issue, check, self.bot, now=100)
+        self.assertEqual(independent['conclusion']['state'], 'unknown')
+        self.assertIsNone(independent['conclusion']['evidence'])
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        result = monitor.tick(100, self.bot)
+        self.assertEqual(result['state'], 'unknown')
+        self.assertIsNone(result['evidence'])
+        self.assertTrue(monitor.stopped)
+        routes = len(self.routes)
+        self.changes = {}
+        self.now = 400
+        self.assertIsNone(monitor.tick(400, self.bot))
+        self.assertEqual(len(self.routes), routes)
+        # Reauthentication never silently restarts the stopped plan.
+        fresh = ReleaseMonitor(ReleasePlan(check, 400, 1000))
+        self.assertEqual(fresh.tick(400, self.bot)['state'], 'healthy')
+        self.assertIs(fresh.plan.check, check)
+
+    def test_out_of_window_sample_refuses_capture_conversion_and_studio_export(self):
+        self.binding = replace(self.binding, context=replace(self.binding.context, start=50))
+        issue, check = self.issue()
+        first, last = issue.events
+        self.changes = {'sample_at': 49}
+        self.sre.read_chart('dashboard', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        with self.assertRaises(GuardError):
+            self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(observer.events, [])
+        forged = replace(issue, events=(replace(first, view=replace(first.view, sample_at=49)), last))
+        with self.assertRaises(GuardError):
+            ChartCheck.from_issue(forged, 1, sre_validated=True, now=100)
+        with self.assertRaises(GuardError):
+            self.sre.export_studio_session(forged, consent=True)
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'unknown')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertEqual(monitor.tick(100, self.bot)['state'], 'unknown')
+        self.changes = {}
+        self.sre.read_chart('dashboard', self.binding)
+        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(len(observer.stop().events), 1)
+        self.assertEqual(len(self.sre.export_studio_session(issue, consent=True)['events']), 2)
+        self.value = 8
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'failure')
+        self.now, self.value = 400, 0
+        self.assertTrue(monitor.tick(400, self.bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, self.bot))
+
+    def test_negative_values_refuse_capture_conversion_and_studio_export(self):
+        issue, check = self.issue()
+        first, last = issue.events
+        self.value = -0.5
+        self.sre.read_chart('dashboard', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        with self.assertRaises(GuardError):
+            self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(observer.events, [])
+        forged = replace(issue, events=(replace(first, view=replace(first.view, value=-0.5)), last))
+        with self.assertRaises(GuardError):
+            ChartCheck.from_issue(forged, 1, sre_validated=True, now=100)
+        with self.assertRaises(GuardError):
+            self.sre.export_studio_session(forged, consent=True)
+        # Existing independent/release evaluation must also remain fail-closed.
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'unknown')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        invalid = monitor.tick(100, self.bot)
+        self.assertEqual(invalid['state'], 'unknown')
+        self.assertFalse(invalid['recovery'])
+        self.value = 0
+        self.sre.read_chart('dashboard', self.binding)
+        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(len(observer.stop().events), 1)
+        self.assertEqual(len(self.sre.export_studio_session(issue, consent=True)['events']), 2)
+        self.value = 8
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'failure')
+        self.now, self.value = 400, 0
+        self.assertTrue(monitor.tick(400, self.bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, self.bot))
+
+    def test_post_capture_sample_refuses_capture_conversion_and_studio_export(self):
+        issue, check = self.issue()
+        first, last = issue.events
+        self.changes = {'sample_at': 101}
+        self.sre.read_chart('dashboard', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        with self.assertRaises(GuardError):
+            self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(observer.events, [])
+        forged = replace(issue, events=(replace(first, view=replace(first.view, sample_at=101)), last))
+        with self.assertRaises(GuardError):
+            ChartCheck.from_issue(forged, 1, sre_validated=True, now=100)
+        with self.assertRaises(GuardError):
+            self.sre.export_studio_session(forged, consent=True)
+        self.changes = {}
+        self.sre.read_chart('dashboard', self.binding)
+        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(len(observer.stop().events), 1)
+        self.assertEqual(len(self.sre.export_studio_session(issue, consent=True)['events']), 2)
+        self.value = 8
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertTrue(monitor.tick(100, self.bot)['report'])
+        self.now, self.value = 400, 0
+        self.assertTrue(monitor.tick(400, self.bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, self.bot))
+
+    def test_negative_timestamps_refuse_capture_conversion_and_studio_export(self):
+        issue, check = self.issue()
+        first, last = issue.events
+        for field in ('captured_at', 'sample_at'):
+            with self.subTest(field=field):
+                self.changes = {field: -1}
+                self.sre.read_chart('dashboard', self.binding)
+                observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+                with self.assertRaises(GuardError):
+                    self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(observer.events, [])
+                forged = replace(issue, events=(replace(first, view=replace(first.view, **{field: -1})), last))
+                with self.assertRaises(GuardError):
+                    ChartCheck.from_issue(forged, 1, sre_validated=True, now=100)
+                with self.assertRaises(GuardError):
+                    self.sre.export_studio_session(forged, consent=True)
+                self.changes = {}
+                self.sre.read_chart('dashboard', self.binding)
+                self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(len(observer.stop().events), 1)
+        self.assertEqual(len(self.sre.export_studio_session(issue, consent=True)['events']), 2)
+        self.value = 8
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertTrue(monitor.tick(100, self.bot)['report'])
+        self.now, self.value = 400, 0
+        self.assertTrue(monitor.tick(400, self.bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, self.bot))
+
+    def test_capture_rollback_over_http_is_unknown_and_fresh_read_recovers(self):
+        issue, check = self.issue()
+        self.now = 99
+        for value in (0, 8):
+            with self.subTest(value=value):
+                self.value = value
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 110, cadence=1))
+                result = investigate_chart(issue, check, self.bot, now=100)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                result = monitor.tick(100, self.bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertTrue(result['report'])
+        self.now, self.value = 101, 8
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=101)['conclusion']['state'], 'failure')
+        self.assertEqual(monitor.tick(101, self.bot)['state'], 'failure')
+        self.now, self.value = 100, 0
+        self.assertEqual(monitor.tick(102, self.bot)['state'], 'unknown')
+        self.now = 103
+        recovered = monitor.tick(103, self.bot)
+        self.assertEqual(recovered['state'], 'healthy')
+        self.assertTrue(recovered['recovery'])
+        self.assertEqual(len(issue.events), 2)
+
+    def test_session_change_during_capture_rejected_without_appending(self):
+        self.sre.read_chart('dashboard', self.binding)
+        original_get = Element.get_attribute
+        session = self.sre.session
+        for changed in ('replacement-driver', None):
+            with self.subTest(changed=changed):
+                self.sre.driver.session_id = session
+                observer = SyntheticObserver(session, [self.binding], consent=True)
+                def switch(element, name):
+                    if name == 'data-chart-view':
+                        element.driver.session_id = changed
+                    return original_get(element, name)
+                with patch.object(Element, 'get_attribute', switch):
+                    with self.assertRaises(GuardError):
+                        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(observer.events, [])
+                self.sre.driver.session_id = session
+                self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(len(observer.events), 1)
+
+    def test_session_change_during_navigation_or_read_is_unknown_then_recovers(self):
+        issue, check = self.issue()
+        session = self.bot.session
+        original_load, original_get = self.bot.driver.get, Element.get_attribute
+        for stage in ('navigation', 'payload'):
+            for value in (0, 8):
+                with self.subTest(stage=stage, value=value):
+                    self.bot.driver.session_id = session
+                    self.now, self.value = 100, value
+                    monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                    def switch_navigation(url):
+                        original_load(url)
+                        self.bot.driver.session_id = self.sre.session
+                    def switch_payload(element, name):
+                        if element.driver is self.bot.driver and name == 'data-chart-view':
+                            element.driver.session_id = self.sre.session
+                        return original_get(element, name)
+                    target, attribute, replacement = ((self.bot.driver, 'get', switch_navigation)
+                        if stage == 'navigation' else (Element, 'get_attribute', switch_payload))
+                    with patch.object(target, attribute, replacement):
+                        result = investigate_chart(issue, check, self.bot, now=100)
+                        self.assertEqual(result['conclusion']['state'], 'unknown')
+                        self.assertIsNone(result['conclusion']['evidence'])
+                        self.bot.driver.session_id = session
+                        result = monitor.tick(100, self.bot)
+                        self.assertEqual(result['state'], 'unknown')
+                        self.assertIsNone(result['evidence'])
+                        self.assertTrue(result['report'])
+                        self.assertEqual(monitor.seen_evidence,
+                                         {check.source_evidence, *check.observer_evidence})
+                    self.bot.driver.session_id = session
+                    self.now, self.value = 400, 0
+                    result = monitor.tick(400, self.bot)
+                    self.assertEqual(result['state'], 'healthy')
+                    self.assertTrue(result['recovery'] and result['report'])
+                    self.assertIsNone(monitor.tick(1000, self.bot))
+
+    def test_http_conflicting_observer_evidence_cannot_replace_validated_chart(self):
+        self.changes = {'evidence_id': 'same-observed-id'}
+        self.sre.read_chart('dashboard', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.value = 8
+        self.sre.read_chart('entity-chart', self.binding)
+        with self.assertRaises(GuardError):
+            self.sre.capture(observer, 'shortcut-open-chart', 'entity-chart', self.binding)
+        self.assertEqual(len(observer.events), 1)
+        self.changes = {'evidence_id': 'fresh-observed-id'}
+        self.sre.read_chart('entity-chart', self.binding)
+        self.sre.capture(observer, 'shortcut-open-chart', 'entity-chart', self.binding)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        self.assertEqual(check.observer_evidence, ('same-observed-id', 'fresh-observed-id'))
+        self.changes = {'evidence_id': 'independent-id'}
+        result = investigate_chart(issue, check, self.bot, now=100)
+        self.assertEqual(result['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.changes = {'evidence_id': 'release-failure'}
+        self.assertEqual(monitor.tick(100, self.bot)['state'], 'failure')
+        self.now, self.value = 400, 0
+        self.changes = {'evidence_id': 'release-recovery'}
+        result = monitor.tick(400, self.bot)
+        self.assertTrue(result['recovery'] and result['report'])
+        self.assertIsNone(monitor.tick(1000, self.bot))
+
+    def test_numeric_text_changed_during_collection_is_not_observed(self):
+        original_get = Element.get_attribute
+        for initial, changed in ((0, '8'), (8, '0'), (0, '')):
+            with self.subTest(initial=initial, changed=changed):
+                self.value = initial
+                self.sre.read_chart('dashboard', self.binding)
+                observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+                def mutate_on_recheck(element, name):
+                    element.payload_reads = getattr(element, 'payload_reads', 0) + (name == 'data-chart-view')
+                    if name == 'data-chart-view' and element.payload_reads == 2:
+                        element.text = changed
+                    return original_get(element, name)
+                with patch.object(Element, 'get_attribute', mutate_on_recheck):
+                    with self.assertRaises(GuardError):
+                        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(observer.events, [])
+                self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(len(observer.events), 1)
+
+    def test_changed_numeric_text_is_unknown_then_release_recovers(self):
+        issue, check = self.issue()
+        original_get = Element.get_attribute
+        for initial, changed in ((0, '8'), (8, '0'), (0, '')):
+            with self.subTest(initial=initial, changed=changed):
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1300))
+                self.now, self.value = 100, initial
+                def mutate_on_recheck(element, name):
+                    element.payload_reads = getattr(element, 'payload_reads', 0) + (name == 'data-chart-view')
+                    if name == 'data-chart-view' and element.payload_reads == 2:
+                        element.text = changed
+                    return original_get(element, name)
+                with patch.object(Element, 'get_attribute', mutate_on_recheck):
+                    result = investigate_chart(issue, check, self.bot, now=100)
+                    tick = monitor.tick(100, self.bot)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIsNone(result['conclusion']['evidence'])
+                self.assertEqual(tick['state'], 'unknown')
+                self.assertIsNone(tick['evidence'])
+                self.assertTrue(tick['report'])
+                self.assertEqual(monitor.seen_evidence, set(check.observer_evidence))
+                self.now, self.value = 400, 0
+                self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+                self.now, self.value = 700, 8
+                self.assertTrue(monitor.tick(700, self.bot)['report'])
+                self.now = 1000
+                self.assertFalse(monitor.tick(1000, self.bot)['report'])
+                self.assertIsNone(monitor.tick(1300, self.bot))
+                self.assertTrue(monitor.stopped)
+
+    def test_chart_payload_changed_during_text_collection_is_not_observed(self):
+        self.sre.read_chart('dashboard', self.binding)
+        original_get = Element.get_attribute
+        for change in ({'session_valid': False}, {'state': 'loading'}, {'evidence_id': 'replaced'}, None):
+            with self.subTest(change=change):
+                observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+                reads = {}
+                def changing_payload(element, name):
+                    payload = original_get(element, name)
+                    if name == 'data-chart-view':
+                        reads[id(element)] = reads.get(id(element), 0) + 1
+                        if reads[id(element)] > 1:
+                            if change is None:
+                                return None
+                            data = json.loads(payload)
+                            data.update(change)
+                            return json.dumps(data)
+                    return payload
+                with patch.object(Element, 'get_attribute', changing_payload):
+                    with self.assertRaises(GuardError):
+                        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(observer.events, [])
+                self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(len(observer.events), 1)
+
+    def test_changed_chart_payload_is_unknown_then_release_recovers(self):
+        issue, check = self.issue()
+        original_get = Element.get_attribute
+        for change in ({'session_valid': False}, {'state': 'loading'}, {'evidence_id': 'replaced'}, None):
+            with self.subTest(change=change):
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1300))
+                reads = {}
+                def changing_payload(element, name):
+                    payload = original_get(element, name)
+                    if name == 'data-chart-view':
+                        reads[element] = reads.get(element, 0) + 1
+                        if reads[element] > 1:
+                            if change is None:
+                                return None
+                            data = json.loads(payload)
+                            data.update(change)
+                            return json.dumps(data)
+                    return payload
+                self.now, self.value = 100, 0
+                with patch.object(Element, 'get_attribute', changing_payload):
+                    result = investigate_chart(issue, check, self.bot, now=100)
+                    tick = monitor.tick(100, self.bot)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIsNone(result['conclusion']['evidence'])
+                self.assertEqual(tick['state'], 'unknown')
+                self.assertIsNone(tick['evidence'])
+                self.assertTrue(tick['report'])
+                self.assertEqual(monitor.seen_evidence, set(check.observer_evidence))
+                self.assertFalse(monitor.stopped)
+                self.now = 400
+                self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+                self.now, self.value = 700, 8
+                self.assertTrue(monitor.tick(700, self.bot)['report'])
+                self.now = 1000
+                self.assertFalse(monitor.tick(1000, self.bot)['report'])
+                self.assertIsNone(monitor.tick(1300, self.bot))
+                self.assertTrue(monitor.stopped)
+
+    def test_chart_hidden_after_text_collection_is_not_observed(self):
+        self.sre.read_chart('dashboard', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        original = Element.is_displayed
+        def displayed(element):
+            return not getattr(element, 'hidden_after_read', False) and original(element)
+        def read_and_hide(element):
+            element.hidden_after_read = True
+            return element.saved_text
+        def set_text(element, value):
+            element.saved_text = value
+        # The normal numeric text read succeeds; the page then hides the chart.
+        for element in self.sre.driver.dom.elements:
+            element.saved_text = element.text
+        with patch.object(Element, 'is_displayed', displayed), patch.object(
+                Element, 'text', property(read_and_hide, set_text), create=True):
+            with self.assertRaises(GuardError):
+                self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(observer.events, [])
+        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+        self.assertEqual(len(observer.events), 1)
+
+    def test_hidden_after_text_is_unknown_for_investigation_and_release(self):
+        issue, check = self.issue()
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1300))
+        original_load = self.bot._load
+        def hide_after_read(path):
+            original_load(path)
+            element = self.bot.driver.find_elements(None, '[data-chart-view]')[0]
+            element.is_displayed = Mock(side_effect=[True, False])
+        with patch.object(self.bot, '_load', hide_after_read):
+            result = investigate_chart(issue, check, self.bot, now=100)
+            tick = monitor.tick(100, self.bot)
+        self.assertEqual(result['conclusion']['state'], 'unknown')
+        self.assertIsNone(result['conclusion']['evidence'])
+        self.assertEqual(tick['state'], 'unknown')
+        self.assertIsNone(tick['evidence'])
+        self.assertTrue(tick['report'])
+        self.assertEqual(monitor.seen_evidence, set(check.observer_evidence))
+        self.now = 400
+        self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+        self.now, self.value = 700, 8
+        self.assertTrue(monitor.tick(700, self.bot)['report'])
+        self.now = 1000
+        self.assertFalse(monitor.tick(1000, self.bot)['report'])
+        self.assertIsNone(monitor.tick(1300, self.bot))
+        self.assertTrue(monitor.stopped)
+
+    def test_filter_wire_shapes_are_not_silently_coerced(self):
+        cases = [((), ''), ((), {}), ((('a', 'b'),), ['ab']),
+                 ((('a', 'b'),), {'ab': 'ignored'}), ((('a', 'b'),), [{'a': 1, 'b': 2}])]
+        for expected, malformed in cases:
+            with self.subTest(filters=malformed):
+                binding = replace(self.binding, filters=expected)
+                data = json.loads(json.dumps(asdict(binding)))
+                self.assertEqual(binding_from_data(data), binding)
+                data['filters'] = malformed
+                with self.assertRaises(GuardError):
+                    binding_from_data(data)
+
+    def test_http_rejects_malformed_filter_requests_before_chart_read(self):
+        for malformed in ('', {}, ['ab'], {'ab': 'ignored'}):
+            with self.subTest(filters=malformed):
+                data = asdict(self.binding)
+                data['filters'] = malformed
+                url = self.origin + '/chart/dashboard?' + urlencode({'binding': json.dumps(data)})
+                with self.assertRaises(HTTPError) as error:
+                    urlopen(url, timeout=5)
+                self.assertEqual(error.exception.code, 400)
+                self.assertEqual(self.routes, [])
+        self.sre.read_chart('dashboard', self.binding)
+        self.assertEqual(self.routes, ['dashboard'])
+
+    def test_malformed_filter_evidence_is_unknown_then_fresh_release_recovers(self):
+        self.binding = replace(self.binding, filters=(('a', 'b'),))
+        issue, check = self.issue()
+        original_get = Element.get_attribute
+        def malformed_filters(element, name):
+            payload = original_get(element, name)
+            if name == 'data-chart-view':
+                data = json.loads(payload)
+                data['binding']['filters'] = ['ab']
+                return json.dumps(data)
+            return payload
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1300))
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        with patch.object(Element, 'get_attribute', malformed_filters):
+            with self.subTest(phase='observer'):
+                with self.assertRaises(GuardError):
+                    self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                self.assertEqual(observer.events, [])
+            with self.subTest(phase='investigation'):
+                result = investigate_chart(issue, check, self.bot, now=100)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIsNone(result['conclusion']['evidence'])
+            with self.subTest(phase='release'):
+                result = monitor.tick(100, self.bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertTrue(result['report'])
+                self.assertIsNone(result['evidence'])
+                self.assertEqual(monitor.seen_evidence, set(check.observer_evidence))
+        self.now = 400
+        self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+        self.value, self.now = 8, 700
+        self.assertTrue(monitor.tick(700, self.bot)['report'])
+        self.now = 1000
+        self.assertTrue(monitor.tick(1000, self.bot)['duplicate'])
+        self.assertIsNone(monitor.tick(1300, self.bot))
+        self.assertTrue(monitor.stopped)
+
     def test_http_dom_observation_independent_navigation_and_release_reuse(self):
         issue, check = self.issue()
         original_url = self.sre.driver.current_url
@@ -70,6 +560,42 @@ class ChartDOMTests(unittest.TestCase):
         self.assertIsNone(monitor.tick(1000, self.bot))
         self.assertEqual(len(self.routes), reads)
 
+    def test_duplicate_json_evidence_is_rejected_before_observation_and_recovers(self):
+        issue, check = self.issue()
+        original_get = Element.get_attribute
+        # Every conflicting pair used to keep the final (apparently healthy) value.
+        pairs = [('"session_valid": true', '"session_valid": false, "session_valid": true'),
+                 ('"sample_at": 100', '"sample_at": -400, "sample_at": 100'),
+                 ('"chart": "error-rate"', '"chart": "other", "chart": "error-rate"'),
+                 ('"function": "checkout"', '"function": "other", "function": "checkout"')]
+        for old, ambiguous in pairs:
+            with self.subTest(field=old):
+                def get_attribute(element, name):
+                    value = original_get(element, name)
+                    if name == 'data-chart-view':
+                        self.assertIn(old, value)
+                        return value.replace(old, ambiguous, 1)
+                    return value
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+                with patch.object(Element, 'get_attribute', get_attribute):
+                    with self.assertRaises(GuardError):
+                        self.sre.capture(observer, 'navigate', 'dashboard', self.binding)
+                    self.assertEqual(observer.events, [])
+                    result = investigate_chart(issue, check, self.bot, now=100)
+                    self.assertEqual(result['conclusion']['state'], 'unknown')
+                    self.assertIsNone(result['conclusion']['evidence'])
+                    result = monitor.tick(100, self.bot)
+                    self.assertEqual(result['state'], 'unknown')
+                    self.assertTrue(result['report'])
+                    self.assertIsNone(result['evidence'])
+                    self.assertEqual(monitor.seen_evidence, {check.source_evidence})
+                self.now = 400
+                result = monitor.tick(400, self.bot)
+                self.assertEqual(result['state'], 'healthy')
+                self.assertTrue(result['report'])
+                self.now = 100
+
     def test_http_dom_sample_newer_than_capture_is_not_trusted(self):
         issue, check = self.issue()
         self.changes = {'captured_at': 99}  # Sample=100 and now=100: fresh but inconsistent.
@@ -84,7 +610,82 @@ class ChartDOMTests(unittest.TestCase):
         self.changes, self.now = {}, 400
         result = monitor.tick(400, self.bot)
         self.assertEqual(result['state'], 'healthy')
-        self.assertFalse(result['report'])
+        self.assertTrue(result['report'])
+
+    def test_http_dom_truncated_issue_cannot_erase_validated_check_provenance(self):
+        self.sre.read_chart('entity-chart', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        self.sre.capture(observer, 'navigate', 'entity-chart', self.binding)
+        earlier = observer.events[-1].view.evidence_id
+        self.sre.read_chart('dashboard', self.binding)
+        self.sre.capture(observer, 'shortcut-open-chart', 'dashboard', self.binding)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        issue = replace(issue, events=issue.events[-1:])
+        self.assertNotEqual(earlier, check.source_evidence)
+        original_url = self.sre.driver.current_url
+        self.changes = {'evidence_id': earlier}
+        for value in (0, 8):
+            with self.subTest(value=value):
+                self.value = value
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 110, cadence=1))
+                result = investigate_chart(issue, check, self.bot, now=100)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertEqual(result['conclusion']['evidence'], earlier)
+                self.assertEqual(self.sre.driver.current_url, original_url)
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                release = monitor.tick(100, self.bot)
+                self.assertEqual(release['state'], 'unknown')
+                self.assertEqual(release['evidence'], earlier)
+                self.assertTrue(release['report'])
+                self.assertEqual(monitor.seen_evidence, {earlier, check.source_evidence})
+        self.changes = {}
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertEqual(monitor.tick(100, self.bot)['state'], 'failure')
+        self.assertTrue(monitor.tick(400, self.bot)['duplicate'])
+        self.value, self.now = 0, 700
+        self.assertEqual(monitor.tick(700, self.bot)['state'], 'healthy')
+        reads = len(self.routes)
+        self.assertIsNone(monitor.tick(1000, self.bot))
+        self.assertEqual(len(self.routes), reads)
+
+    def test_http_dom_replayed_earlier_observer_evidence_is_unknown(self):
+        self.sre.read_chart('entity-chart', self.binding)
+        observer = SyntheticObserver(self.sre.session, [self.binding], consent=True)
+        self.sre.capture(observer, 'navigate', 'entity-chart', self.binding)
+        earlier = observer.events[-1].view.evidence_id
+        self.sre.read_chart('dashboard', self.binding)
+        self.sre.capture(observer, 'shortcut-open-chart', 'dashboard', self.binding)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        self.assertNotEqual(earlier, check.source_evidence)
+        original_url = self.sre.driver.current_url
+        self.changes = {'evidence_id': earlier}
+        for value in (0, 8):
+            with self.subTest(value=value):
+                self.value = value
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 110, cadence=1))
+                result = investigate_chart(issue, check, self.bot, now=100)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertEqual(result['conclusion']['evidence'], earlier)
+                self.assertEqual(self.sre.driver.current_url, original_url)
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                release = monitor.tick(100, self.bot)
+                self.assertEqual(release['state'], 'unknown')
+                self.assertEqual(release['evidence'], earlier)
+                self.assertTrue(release['report'])
+                self.assertEqual(monitor.seen_evidence, {earlier, check.source_evidence})
+        self.changes = {}
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertEqual(monitor.tick(100, self.bot)['state'], 'failure')
+        self.assertTrue(monitor.tick(400, self.bot)['duplicate'])
+        self.value, self.now = 0, 700
+        self.assertEqual(monitor.tick(700, self.bot)['state'], 'healthy')
+        reads = len(self.routes)
+        self.assertIsNone(monitor.tick(1000, self.bot))
+        self.assertEqual(len(self.routes), reads)
 
     def test_dom_loading_missing_stale_drift_session_and_changed_filters(self):
         issue, check = self.issue()
@@ -137,6 +738,72 @@ class ChartDOMTests(unittest.TestCase):
             element.text, element.attrs['data-chart-view'] = text, payload
             with self.assertRaises(GuardError):
                 self.sre.read_visible(self.binding, 'dashboard')
+
+    def test_same_origin_navigation_during_read_is_rejected(self):
+        for stage in ('wait', 'payload', 'text'):
+            for target in ('/chart/entity-chart', '/login', '/chart/dashboard?changed=filters'):
+                with self.subTest(stage=stage, target=target):
+                    self.sre.read_chart('dashboard', self.binding)
+                    element = self.sre.driver.find_element(None, '[data-chart-view]')
+                    payload, text = element.get_attribute('data-chart-view'), element.text
+                    port = self.sre
+                    reads = []
+
+                    class NavigatingElement:
+                        def is_displayed(self):
+                            return True
+
+                        def get_attribute(self, name):
+                            reads.append('payload')
+                            if stage == 'payload':
+                                port.driver.current_url = self.origin + target
+                            return payload
+
+                        @property
+                        def text(self):
+                            reads.append('text')
+                            if stage == 'text':
+                                port.driver.current_url = self.origin + target
+                            return text
+
+                    wrapped = NavigatingElement()
+                    wrapped.origin = self.origin
+                    def wait(selector):
+                        if stage == 'wait':
+                            port.driver.current_url = self.origin + target
+                        return wrapped
+                    original_wait = port._wait
+                    port._wait = wait
+                    observer = SyntheticObserver(port.session, [self.binding], consent=True)
+                    try:
+                        with self.assertRaises(GuardError):
+                            port.capture(observer, 'navigate', 'dashboard', self.binding)
+                        self.assertEqual(observer.events, [])
+                        if stage == 'wait':
+                            self.assertEqual(reads, [])
+                    finally:
+                        port._wait = original_wait
+
+    def test_navigation_during_bot_read_is_unknown_then_recovers_for_release(self):
+        issue, check = self.issue()
+        original_wait = self.bot._wait
+        def redirect(selector):
+            element = original_wait(selector)
+            self.bot.driver.current_url = self.origin + '/login'
+            return element
+        self.bot._wait = redirect
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        try:
+            self.assertEqual(investigate_chart(issue, check, self.bot, now=100)['conclusion']['state'], 'unknown')
+            result = monitor.tick(100, self.bot)
+            self.assertEqual(result['state'], 'unknown')
+            self.assertTrue(result['report'])
+            self.assertEqual(monitor.seen_evidence, {check.source_evidence})
+        finally:
+            self.bot._wait = original_wait
+        self.now = 400
+        self.assertEqual(monitor.tick(400, self.bot)['state'], 'healthy')
+        self.assertEqual(investigate_chart(issue, check, self.bot, now=400)['conclusion']['state'], 'healthy')
 
     def test_redirect_during_wait_is_rejected_before_reading_payload(self):
         self.sre.read_chart('dashboard', self.binding)

@@ -34,6 +34,205 @@ class ChartJourneyTests(unittest.TestCase):
         self.issue = self.observer.stop()
         self.check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
 
+    def test_large_integer_chart_values_are_finite_without_float_coercion(self):
+        huge = 10 ** 400
+        for value in (huge, huge + 1):
+            with self.subTest(value=value):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                view = replace(self.view, value=value)
+                observer.record('navigate', 'dashboard', view)
+                check = ChartCheck.from_issue(observer.stop(), huge, sre_validated=True, now=100)
+                self.assertEqual(check.maximum, huge)
+                expected = 'healthy' if value == huge else 'failure'
+                self.assertEqual(check.evaluate(view, 100)['state'], expected)
+        check = replace(self.check, maximum=huge)
+        self.assertEqual(check.evaluate(replace(self.view, value=huge + 1), 100)['state'], 'failure')
+
+    def test_large_integer_independent_and_same_check_release_keep_exact_comparison(self):
+        huge = 10 ** 400
+        # Ordinary observed chart; only the explicit threshold is very large.
+        check = replace(self.check, maximum=huge)
+        bot = FakeBrowser(replace(self.view, evidence_id='bot-huge', value=huge + 1))
+        result = investigate_chart(self.issue, check, bot, now=100)
+        self.assertEqual(result['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        self.assertEqual(monitor.tick(100, bot)['state'], 'failure')
+        bot.view = replace(bot.view, evidence_id='bot-recovery', captured_at=400, sample_at=400, value=huge)
+        self.assertTrue(monitor.tick(400, bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, bot))
+        self.assertTrue(monitor.stopped)
+
+    def test_numeric_domain_still_rejects_negative_boolean_and_nonfinite_values(self):
+        for value in (-10 ** 400, True, False, float('nan'), float('inf'), -float('inf')):
+            with self.subTest(value=value):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', replace(self.view, value=value))
+                self.assertEqual(observer.events, [])
+                with self.assertRaises(GuardError):
+                    replace(self.check, maximum=value)
+                with self.assertRaises(GuardError):
+                    ChartCheck.from_issue(self.issue, value, sre_validated=True, now=100)
+                self.assertEqual(self.check.evaluate(replace(self.view, value=value), 100)['state'], 'unknown')
+
+    def test_observer_refuses_samples_outside_bound_window_in_all_states(self):
+        binding = replace(self.binding, context=replace(self.binding.context, start=50, end=150))
+        for state in ('ready', 'loading', 'missing'):
+            for sample in (49, 151):
+                with self.subTest(state=state, sample=sample):
+                    observer = SyntheticObserver('sre', [binding], consent=True)
+                    view = replace(self.view, binding=binding, captured_at=200, sample_at=sample, state=state)
+                    with self.assertRaises(GuardError):
+                        observer.record('navigate', 'dashboard', view)
+                    self.assertEqual(observer.events, [])
+                    for boundary in (50, 150):
+                        observer.record('navigate', 'dashboard', replace(view, evidence_id='boundary-' + str(boundary), sample_at=boundary))
+                    self.assertEqual(len(observer.stop().events), 2)
+
+    def test_check_refuses_out_of_window_sample_hidden_before_valid_final(self):
+        binding = replace(self.binding, context=replace(self.binding.context, start=50, end=150))
+        first, last = self.issue.events
+        last = replace(last, view=replace(last.view, binding=binding, captured_at=200))
+        for sample in (49, 151):
+            with self.subTest(sample=sample):
+                invalid = replace(first, view=replace(first.view, binding=binding, evidence_id="outside-window", captured_at=200, sample_at=sample))
+                with self.assertRaises(GuardError):
+                    ChartCheck.from_issue(replace(self.issue, events=(invalid, last)), 1, sre_validated=True, now=200)
+
+    def test_observer_refuses_negative_values_without_poisoning_history(self):
+        for state in ('ready', 'loading', 'missing'):
+            with self.subTest(state=state):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', replace(self.view, value=-0.5, state=state))
+                self.assertEqual(observer.events, [])
+                # Missing data and signed zero remain valid representation inputs.
+                for value in (None, -0.0, 0, 8):
+                    observer.record('navigate', 'dashboard', replace(self.view, evidence_id='value-' + str(len(observer.events)), value=value, state=state))
+                self.assertEqual(len(observer.stop().events), 4)
+
+    def test_check_rejects_negative_value_hidden_in_earlier_issue_event(self):
+        first, last = self.issue.events
+        malformed = replace(first, view=replace(first.view, evidence_id='negative-earlier', value=-0.5))
+        with self.assertRaises(GuardError):
+            ChartCheck.from_issue(replace(self.issue, events=(malformed, last)), 1, sre_validated=True, now=100)
+
+    def test_observer_refuses_post_capture_samples_in_all_states(self):
+        for state in ('ready', 'loading', 'missing'):
+            with self.subTest(state=state):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', replace(self.view, sample_at=101, state=state))
+                self.assertEqual(observer.events, [])
+                observer.record('navigate', 'dashboard', replace(self.view, state=state))
+                self.assertEqual(len(observer.stop().events), 1)
+
+    def test_check_refuses_post_capture_sample_in_earlier_history(self):
+        first, last = self.issue.events
+        invalid = replace(first, view=replace(first.view, evidence_id='invalid-earlier', sample_at=101))
+        with self.assertRaises(GuardError):
+            ChartCheck.from_issue(replace(self.issue, events=(invalid, last)), 1, sre_validated=True, now=100)
+
+    def test_independent_read_rejects_sample_rollback_with_fresh_capture(self):
+        for value in (0, 8):
+            with self.subTest(value=value):
+                view = replace(self.view, evidence_id='new-capture-old-sample',
+                               captured_at=101, sample_at=99, value=value)
+                result = investigate_chart(self.issue, self.check, FakeBrowser(view), now=101)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIn('sample predates', result['conclusion']['uncertainty'])
+        view = replace(view, evidence_id='unchanged-sample', sample_at=100)
+        self.assertEqual(investigate_chart(self.issue, self.check, FakeBrowser(view), now=101)['conclusion']['state'], 'failure')
+
+    def test_release_sample_watermark_prevents_false_recovery_and_poisoning(self):
+        monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 120, cadence=1))
+        def tick(now, sample, value=0, **changes):
+            view = replace(self.view, evidence_id='sample-' + str(now), captured_at=now,
+                           sample_at=sample, value=value, **changes)
+            return monitor.tick(now, FakeBrowser(view))
+        # A still-fresh sample from before release start is legitimate initially.
+        self.assertEqual(tick(100, 99)['state'], 'healthy')
+        self.assertEqual(tick(101, 101, 8)['state'], 'failure')
+        for now, value in ((102, 0), (103, 8)):
+            rolled_back = tick(now, 100, value)
+            self.assertEqual(rolled_back['state'], 'unknown')
+            self.assertFalse(rolled_back['recovery'])
+            self.assertIn('sample predates', rolled_back['uncertainty'])
+            self.assertEqual(monitor.last_sample, 101)
+        # Invalid/loading/future and replay reads must never advance the watermark.
+        self.assertEqual(tick(104, 104, state='loading')['state'], 'unknown')
+        self.assertEqual(tick(105, 106)['state'], 'unknown')
+        replay = replace(self.view, evidence_id='sample-101', captured_at=106, sample_at=106)
+        self.assertEqual(monitor.tick(106, FakeBrowser(replay))['state'], 'unknown')
+        self.assertEqual(monitor.last_sample, 101)
+        recovered = tick(107, 101)
+        self.assertEqual(recovered['state'], 'healthy')
+        self.assertTrue(recovered['recovery'])
+        self.assertTrue(recovered['report'])
+        self.assertFalse(tick(108, 101)['report'])
+        self.assertIsNone(monitor.tick(120, FakeBrowser(self.view)))
+
+    def test_observer_rejects_negative_timestamps_without_appending(self):
+        for field in ('captured_at', 'sample_at'):
+            with self.subTest(field=field):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', replace(self.view, **{field: -1}))
+                self.assertEqual(observer.events, [])
+                observer.record('navigate', 'dashboard', self.view)
+                self.assertEqual(len(observer.stop().events), 1)
+
+    def test_check_conversion_rejects_negative_earlier_issue_timestamps(self):
+        first, last = self.issue.events
+        for field in ('captured_at', 'sample_at'):
+            with self.subTest(field=field):
+                invalid = replace(first, view=replace(first.view, evidence_id='earlier', **{field: -1}))
+                issue = replace(self.issue, events=(invalid, last))
+                with self.assertRaises(GuardError):
+                    ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
+        bot = FakeBrowser(replace(self.view, evidence_id='independent', value=8))
+        self.assertEqual(investigate_chart(self.issue, check, bot, now=100)['conclusion']['state'], 'failure')
+        monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+        bot.view = replace(bot.view, evidence_id='release')
+        self.assertTrue(monitor.tick(100, bot)['report'])
+        bot.view = replace(self.view, evidence_id='recovery', captured_at=400, sample_at=400)
+        self.assertTrue(monitor.tick(400, bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, bot))
+
+    def test_evaluation_clock_rejects_coercion_and_invalid_values(self):
+        for now in (True, 100.0, '100', None, float('nan'), float('inf'), -1):
+            with self.subTest(now=repr(now)):
+                view = replace(self.view, captured_at=1, sample_at=1)
+                result = self.check.evaluate(view, now)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertIn('clock', result['uncertainty'])
+        self.assertEqual(self.check.evaluate(self.view, 100)['state'], 'healthy')
+
+    def test_issue_validation_requires_integer_evaluation_clock(self):
+        for now in (True, 100.0, '100', None, float('nan'), float('inf'), -1):
+            with self.subTest(now=repr(now)), self.assertRaises(GuardError):
+                ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=now)
+        self.assertEqual(ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100), self.check)
+
+    def test_invalid_investigation_clock_never_drives_bot_or_mutates_check(self):
+        for now in (True, 100.0, '100', None, float('nan'), float('inf'), -1):
+            with self.subTest(now=repr(now)):
+                bot = FakeBrowser(replace(self.view, evidence_id='fresh', value=8))
+                result = investigate_chart(self.issue, self.check, bot, now=now)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIsNone(result['route'])
+                self.assertEqual(bot.reads, [])
+        # The same validated building block still supports a normal bounded release.
+        bot = FakeBrowser(replace(self.view, evidence_id='release-fresh', value=8))
+        monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 1000))
+        result = monitor.tick(100, bot)
+        self.assertEqual(result['state'], 'failure')
+        self.assertTrue(result['report'])
+        bot.view = replace(self.view, evidence_id='recovered', captured_at=400, sample_at=400)
+        self.assertTrue(monitor.tick(400, bot)['recovery'])
+        self.assertIsNone(monitor.tick(1000, bot))
+
     def test_observer_issue_independent_path_and_grounded_conclusion(self):
         bot = FakeBrowser(replace(self.view, evidence_id='bot-1', value=7))
         result = investigate_chart(self.issue, self.check, bot, now=100)
@@ -44,6 +243,42 @@ class ChartJourneyTests(unittest.TestCase):
         self.assertEqual(result['route'], 'entity-chart')
         self.assertEqual(bot.reads, [('entity-chart', self.binding)])
         self.assertEqual(len(self.issue.events), 2)  # bot never drives observer
+
+    def test_check_conversion_revalidates_entire_issue_not_only_last_chart(self):
+        first, last = self.issue.events
+        invalid = {
+            'conflicting-evidence': (replace(first, view=replace(first.view, value=8)), last),
+            'arbitrary-action': (replace(first, action='type-password'), last),
+            'unknown-route': (replace(first, route='private-page'), last),
+            'unordered-time': (replace(first, view=replace(first.view, evidence_id='older', captured_at=101)), last),
+            'untyped-session': (replace(first, view=replace(first.view, evidence_id='older', session_valid=1)), last),
+            'oversized-history': (first,) * 101,
+        }
+        for name, events in invalid.items():
+            with self.subTest(name=name), self.assertRaises(GuardError):
+                ChartCheck.from_issue(replace(self.issue, events=events), 1,
+                                      sre_validated=True, now=100)
+        # Legitimate repeats still create the same reusable check.
+        check = ChartCheck.from_issue(self.issue, 1, sre_validated=True, now=100)
+        self.assertEqual(check, self.check)
+        self.assertEqual(check.observer_evidence, ('observed-1', 'observed-1'))
+
+    def test_observer_rejects_conflicting_evidence_references_without_losing_history(self):
+        for change in ({'value': 8}, {'captured_at': 101, 'sample_at': 101},
+                       {'state': 'loading', 'value': None}, {'session_valid': False},
+                       {'ui_version': 'chart-v2'}):
+            with self.subTest(change=change):
+                observer = SyntheticObserver('sre', [self.binding], consent=True)
+                observer.record('navigate', 'dashboard', self.view)
+                with self.assertRaises(GuardError):
+                    observer.record('shortcut-open-chart', 'entity-chart', replace(self.view, **change))
+                self.assertEqual(len(observer.events), 1)
+                # Re-observing the same immutable facts is legitimate; new facts need a fresh ID.
+                observer.record('shortcut-open-chart', 'dashboard', self.view)
+                fresh = replace(self.view, evidence_id='observed-2', **change)
+                observer.record('navigate', 'entity-chart', fresh)
+                self.assertEqual([e.view.evidence_id for e in observer.stop().events],
+                                 ['observed-1', 'observed-1', 'observed-2'])
 
     def test_explicit_consent_scope_and_stop(self):
         with self.assertRaises(GuardError):
@@ -96,8 +331,10 @@ class ChartJourneyTests(unittest.TestCase):
             with self.subTest(value=value):
                 inconsistent = replace(self.view, evidence_id='later-sample', sample_at=101, value=value)
                 observer = SyntheticObserver('sre', [self.binding], consent=True)
-                observer.record('navigate', 'dashboard', inconsistent)
-                issue = observer.stop()  # Preserve bad evidence, never validate it.
+                with self.assertRaises(GuardError):
+                    observer.record('navigate', 'dashboard', inconsistent)
+                self.assertEqual(observer.stop().events, ())
+                issue = replace(self.issue, events=(replace(self.issue.events[-1], view=inconsistent),))
                 with self.assertRaises(GuardError):
                     ChartCheck.from_issue(issue, 1, sre_validated=True, now=101)
                 bot = FakeBrowser(inconsistent)
@@ -124,6 +361,40 @@ class ChartJourneyTests(unittest.TestCase):
                     self.assertEqual(result['conclusion']['state'], expected)
                 self.assertEqual(self.monitor().tick(captured, FakeBrowser(view))['state'], expected)
 
+    def test_new_ids_cannot_hide_capture_rollback_in_either_journey(self):
+        for value in (0, 7):
+            with self.subTest(value=value):
+                older = replace(self.view, evidence_id='older-new-id', captured_at=99,
+                                sample_at=99, value=value)
+                result = investigate_chart(self.issue, self.check, FakeBrowser(older), now=100)
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertIn('capture predates', result['conclusion']['uncertainty'])
+                monitor = self.monitor()
+                result = monitor.tick(100, FakeBrowser(older))
+                self.assertEqual(result['state'], 'unknown')
+                self.assertTrue(result['report'])
+
+    def test_release_capture_watermark_rejects_rollback_and_recovers(self):
+        monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 110, cadence=1))
+        def tick(now, captured, value=0, **changes):
+            view = replace(self.view, evidence_id='read-' + str(now), captured_at=captured,
+                           sample_at=min(100, captured), value=value, **changes)
+            return monitor.tick(now, FakeBrowser(view))
+        self.assertEqual(tick(100, 100)['state'], 'healthy')
+        self.assertEqual(tick(101, 101, 7)['state'], 'failure')
+        rolled_back = tick(102, 100)
+        self.assertEqual(rolled_back['state'], 'unknown')
+        self.assertTrue(rolled_back['report'])
+        self.assertFalse(rolled_back['recovery'])
+        # Invalid future capture must not poison the last validated watermark.
+        self.assertEqual(tick(103, 104)['state'], 'unknown')
+        recovered = tick(104, 101)
+        self.assertEqual(recovered['state'], 'healthy')
+        self.assertTrue(recovered['recovery'])
+        # Equal-second captures and unchanged chart samples remain legitimate.
+        self.assertEqual(tick(105, 101, 7)['state'], 'failure')
+        self.assertIsNone(monitor.tick(110, FakeBrowser(self.view)))
+
     def test_validation_requires_rule_and_valid_current_observation(self):
         with self.assertRaises(GuardError):
             ChartCheck.from_issue(self.issue, 1, now=100)
@@ -148,6 +419,49 @@ class ChartJourneyTests(unittest.TestCase):
         result = investigate_chart(self.issue, self.check, FakeBrowser(self.view), now=100)
         self.assertEqual(result['conclusion']['state'], 'unknown')
 
+    def test_investigation_retains_check_provenance_when_issue_is_truncated(self):
+        observer = SyntheticObserver('sre', [self.binding], consent=True)
+        earlier = replace(self.view, evidence_id='earlier-observer', value=7)
+        observer.record('navigate', 'entity-chart', earlier)
+        observer.record('shortcut-open-chart', 'dashboard', self.view)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        issue = replace(issue, events=issue.events[-1:])
+        for value in (0, 7):
+            with self.subTest(value=value):
+                bot = FakeBrowser(replace(earlier, value=value))
+                result = investigate_chart(issue, check, bot, now=100)
+                self.assertEqual(result['observed']['state'], 'healthy')
+                self.assertEqual(result['route'], 'entity-chart')
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertEqual(result['conclusion']['evidence'], 'earlier-observer')
+                self.assertEqual(result['conclusion']['uncertainty'], 'reused observer evidence')
+                self.assertEqual(bot.reads, [('entity-chart', self.binding)])
+        bot = FakeBrowser(replace(earlier, evidence_id='independent-bot'))
+        self.assertEqual(investigate_chart(issue, check, bot, now=100)['conclusion']['state'], 'failure')
+        self.assertEqual(len(issue.events), 1)
+
+    def test_investigation_rejects_every_observer_event_not_only_check_source(self):
+        observer = SyntheticObserver('sre', [self.binding], consent=True)
+        earlier = replace(self.view, evidence_id='earlier-observer', value=7)
+        observer.record('navigate', 'entity-chart', earlier)
+        observer.record('shortcut-open-chart', 'dashboard', self.view)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        for value in (0, 7):
+            with self.subTest(value=value):
+                bot = FakeBrowser(replace(earlier, value=value))
+                result = investigate_chart(issue, check, bot, now=100)
+                self.assertEqual(result['observed']['state'], 'healthy')
+                self.assertEqual(result['route'], 'entity-chart')
+                self.assertEqual(result['conclusion']['state'], 'unknown')
+                self.assertEqual(result['conclusion']['evidence'], 'earlier-observer')
+                self.assertEqual(result['conclusion']['uncertainty'], 'reused observer evidence')
+                self.assertEqual(bot.reads, [('entity-chart', self.binding)])
+        bot = FakeBrowser(replace(earlier, evidence_id='independent-bot'))
+        self.assertEqual(investigate_chart(issue, check, bot, now=100)['conclusion']['state'], 'failure')
+        self.assertEqual(issue.events[0].view, earlier)
+
     def monitor(self, end=1600):
         return ReleaseMonitor(ReleasePlan(self.check, 100, end))
 
@@ -162,12 +476,52 @@ class ChartJourneyTests(unittest.TestCase):
             states.append((result['state'], result['report'], result['duplicate']))
             self.assertIsNone(monitor.tick(now + 1, bot))
         self.assertEqual(states, [('healthy', False, False), ('failure', True, False),
-                                  ('failure', False, True), ('healthy', False, False), ('failure', True, False)])
+                                  ('failure', False, True), ('healthy', True, False), ('failure', True, False)])
         self.assertIsNone(monitor.tick(1600, bot))
         self.assertTrue(monitor.stopped)
         self.assertEqual(len(bot.reads), 5)
         self.assertIs(monitor.plan.check, self.check)  # exact observed check is reused
         self.assertEqual(monitor.plan.cadence, 300)
+
+    def test_expired_release_stops_even_with_malformed_evidence_reference(self):
+        for evidence in (None, 7, [], {}, 'https://private.invalid/token'):
+            with self.subTest(evidence=evidence):
+                monitor = self.monitor()
+                bot = FakeBrowser(replace(self.view, evidence_id=evidence, session_valid=False))
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertIsNone(result['evidence'])
+                self.assertTrue(result['report'])
+                self.assertTrue(monitor.stopped)
+                self.assertIsNone(monitor.tick(400, bot))
+                self.assertEqual(len(bot.reads), 1)
+                self.assertEqual(monitor.seen_evidence, {self.check.source_evidence, *self.check.observer_evidence})
+
+    def test_expiry_from_switched_session_cannot_stop_original_release(self):
+        monitor = self.monitor()
+        bot = FakeBrowser(replace(self.view, evidence_id='expired', session_valid=False))
+        def switched(route, binding):
+            bot.session = 'other-session'
+            return bot.view
+        bot.read_chart = switched
+        result = monitor.tick(100, bot)
+        self.assertEqual(result['state'], 'unknown')
+        self.assertIsNone(result['evidence'])
+        self.assertFalse(monitor.stopped)
+
+    def test_untyped_expiry_cannot_stop_release_and_valid_read_recovers(self):
+        for state in (0, '', None, 'false'):
+            with self.subTest(state=state):
+                monitor = self.monitor()
+                bot = FakeBrowser(replace(self.view, evidence_id='untyped', session_valid=state))
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertFalse(monitor.stopped)
+                bot.view = replace(self.view, evidence_id='recovered', captured_at=400, sample_at=400)
+                result = monitor.tick(400, bot)
+                self.assertEqual(result['state'], 'healthy')
+                self.assertTrue(result['recovery'])
+                self.assertEqual(len(bot.reads), 2)
 
     def test_release_unknown_evidence_and_expired_session_stop(self):
         for defect in ['loading', 'missing', 'stale', 'wrong-context', 'drift', 'expired']:
@@ -276,7 +630,7 @@ class ChartJourneyTests(unittest.TestCase):
                 result = monitor.tick(now, bot)
                 self.assertEqual(result['state'], expected)
                 self.assertEqual(result['evidence'], evidence)
-                self.assertEqual(result['report'], expected == 'unknown')
+                self.assertEqual(result['report'], expected == 'unknown' or now == 103)
         self.assertEqual(len(bot.reads), 5)
 
     def test_invalid_evidence_cannot_be_recycled_after_recovery(self):
@@ -299,6 +653,62 @@ class ChartJourneyTests(unittest.TestCase):
         self.assertIsNone(result['evidence'])
         self.assertNotIn('password', str(result))
 
+    def test_release_rejects_every_observer_event_before_fresh_recovery(self):
+        observer = SyntheticObserver('sre', [self.binding], consent=True)
+        earlier = replace(self.view, evidence_id='earlier-observer', value=7)
+        observer.record('navigate', 'entity-chart', earlier)
+        observer.record('shortcut-open-chart', 'dashboard', self.view)
+        issue = observer.stop()
+        check = ChartCheck.from_issue(issue, 1, sre_validated=True, now=100)
+        for value in (0, 7):
+            with self.subTest(value=value):
+                monitor = ReleaseMonitor(ReleasePlan(check, 100, 1000))
+                bot = FakeBrowser(replace(earlier, value=value))
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertEqual(result['evidence'], 'earlier-observer')
+                self.assertTrue(result['report'])
+                self.assertEqual(monitor.seen_evidence, {'observed-1', 'earlier-observer'})
+                bot.view = replace(self.view, evidence_id='fresh-400', captured_at=400, sample_at=400)
+                self.assertEqual(monitor.tick(400, bot)['state'], 'healthy')
+                bot.view = replace(bot.view, evidence_id='fresh-700', captured_at=700, sample_at=700, value=7)
+                self.assertTrue(monitor.tick(700, bot)['report'])
+                self.assertIsNone(monitor.tick(1000, bot))
+                self.assertTrue(monitor.stopped)
+        self.assertEqual(issue.events[0].view, earlier)
+
+    def test_check_observer_evidence_is_bounded_immutable_and_semantic(self):
+        for invalid in (['earlier'], ('raw password!',), tuple('e' for _ in range(101))):
+            with self.subTest(invalid=type(invalid).__name__), self.assertRaises(GuardError):
+                replace(self.check, observer_evidence=invalid)
+        legacy = ChartCheck(self.binding, 1, 'observed-1', 'sre')
+        self.assertEqual(ReleaseMonitor(ReleasePlan(legacy, 100, 1000)).seen_evidence, {'observed-1'})
+
+    def test_recovery_reports_once_after_failure_or_unknown_but_not_initial_health(self):
+        for bad in (replace(self.view, value=5), replace(self.view, state='loading'),
+                    RuntimeError('private transport detail')):
+            with self.subTest(bad=type(bad).__name__):
+                monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 110, cadence=1))
+                bot = FakeBrowser(replace(self.view, evidence_id='initial'))
+                initial = monitor.tick(100, bot)
+                self.assertFalse(initial['report'])
+                self.assertFalse(initial['recovery'])
+                bot.view = replace(bad, evidence_id='bad') if isinstance(bad, ChartView) else bad
+                self.assertTrue(monitor.tick(101, bot)['report'])
+                bot.view = replace(self.view, evidence_id='fresh', captured_at=102, sample_at=102)
+                recovered = monitor.tick(102, bot)
+                self.assertEqual(recovered['state'], 'healthy')
+                self.assertTrue(recovered['report'])
+                self.assertTrue(recovered['recovery'])
+                self.assertFalse(recovered['duplicate'])
+                bot.view = replace(self.view, evidence_id='still-healthy', captured_at=103, sample_at=103)
+                repeated = monitor.tick(103, bot)
+                self.assertFalse(repeated['report'])
+                self.assertFalse(repeated['recovery'])
+                self.assertTrue(repeated['duplicate'])
+                monitor.stop()
+                self.assertIsNone(monitor.tick(104, bot))
+
     def test_plan_bounds_and_schema_guards(self):
         for start, end, cadence in [(100, 100, 300), (100, 999999, 300), (-1, 100, 300),
                                     (0, 100, 0), (0, 100, True)]:
@@ -311,3 +721,123 @@ class ChartJourneyTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
+class SessionBoundaryTests(unittest.TestCase):
+    setUp = ChartJourneyTests.setUp
+    def test_independent_requires_valid_session_before_read(self):
+        fixture = ChartJourneyTests()
+        fixture.setUp()
+        for session in (None, '', 7, 'x' * 81, 'raw/session'):
+            for value in (0, 8):
+                with self.subTest(session=session, value=value):
+                    bot = FakeBrowser(replace(fixture.view, evidence_id='fresh', value=value))
+                    bot.session = session
+                    with self.assertRaises(GuardError):
+                        investigate_chart(fixture.issue, fixture.check, bot, now=100)
+                    self.assertEqual(bot.reads, [])
+
+    def test_release_requires_valid_session_without_consuming_due_slot(self):
+        fixture = ChartJourneyTests()
+        fixture.setUp()
+        for session in (None, '', 7, 'x' * 81, 'raw/session'):
+            with self.subTest(session=session):
+                bot = FakeBrowser(replace(fixture.view, evidence_id='fresh'))
+                bot.session = session
+                monitor = ReleaseMonitor(ReleasePlan(fixture.check, 100, 1000))
+                self.assertIsNone(monitor.tick(99, bot))  # not due: no identity/read needed
+                before = (monitor.next_due, monitor.last_capture, set(monitor.seen_evidence), monitor.last_state)
+                with self.assertRaises(GuardError):
+                    monitor.tick(100, bot)
+                self.assertEqual(bot.reads, [])
+                self.assertEqual((monitor.next_due, monitor.last_capture, monitor.seen_evidence, monitor.last_state), before)
+                bot.session = 'bot'
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'healthy')
+                self.assertFalse(result['report'])
+                monitor.stop()
+                bot.session = None
+                self.assertIsNone(monitor.tick(400, bot))
+                ended = ReleaseMonitor(ReleasePlan(fixture.check, 100, 1000))
+                self.assertIsNone(ended.tick(1000, bot))
+
+    def test_independent_adapter_session_change_is_unknown(self):
+        for session in ('sre', 'other-bot', None):
+            for value in (0, 8):
+                with self.subTest(session=session, value=value):
+                    bot = FakeBrowser(replace(self.view, evidence_id='fresh-bot', value=value))
+                    read = bot.read_chart
+                    def switched(route, binding):
+                        view = read(route, binding)
+                        bot.session = session
+                        return view
+                    bot.read_chart = switched
+                    result = investigate_chart(self.issue, self.check, bot, now=100)
+                    self.assertEqual(result['conclusion']['state'], 'unknown')
+                    self.assertIsNone(result['conclusion']['evidence'])
+                    self.assertEqual(len(self.issue.events), 2)
+
+    def test_release_adapter_session_change_does_not_commit_evidence(self):
+        for session in ('sre', 'other-bot', None):
+            with self.subTest(session=session):
+                monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 1000))
+                bot = FakeBrowser(replace(self.view, evidence_id='fresh-release', value=8))
+                read = bot.read_chart
+                def switched(route, binding):
+                    view = read(route, binding)
+                    bot.session = session
+                    return view
+                bot.read_chart = switched
+                result = monitor.tick(100, bot)
+                self.assertEqual(result['state'], 'unknown')
+                self.assertIsNone(result['evidence'])
+                self.assertNotIn('fresh-release', monitor.seen_evidence)
+                self.assertEqual(monitor.last_capture, 100)
+                bot.session = 'bot'
+                bot.read_chart = read
+                bot.view = replace(self.view, evidence_id='recovered', captured_at=400, sample_at=400)
+                recovered = monitor.tick(400, bot)
+                self.assertEqual(recovered['state'], 'healthy')
+                self.assertTrue(recovered['recovery'])
+                self.assertTrue(recovered['report'])
+                self.assertIsNone(monitor.tick(1000, bot))
+
+class EvidenceReferenceTests(unittest.TestCase):
+    setUp = ChartJourneyTests.setUp
+
+    def test_invalid_reference_returns_unknown_without_echo_or_exception(self):
+        for evidence in ('https://synthetic.invalid/?token=fixture-secret', '', 'x' * 101,
+                         None, 7, True, ['fixture-secret'], {'secret': 'fixture-secret'}):
+            for state in ('ready', 'loading'):
+                with self.subTest(evidence=type(evidence).__name__, state=state):
+                    view = replace(self.view, evidence_id=evidence, state=state)
+                    result = self.check.evaluate(view, 100)
+                    self.assertEqual(result['state'], 'unknown')
+                    self.assertIsNone(result['evidence'])
+                    self.assertNotIn('fixture-secret', str(result))
+                    bot = FakeBrowser(view)
+                    independent = investigate_chart(self.issue, self.check, bot, now=100)
+                    self.assertEqual(independent['conclusion']['state'], 'unknown')
+                    self.assertIsNone(independent['conclusion']['evidence'])
+                    self.assertEqual(len(bot.reads), 1)
+
+    def test_same_check_release_rejects_bad_reference_then_recovers(self):
+        for evidence in ('raw fixture-secret!', None, ['fixture-secret']):
+            with self.subTest(evidence=type(evidence).__name__):
+                monitor = ReleaseMonitor(ReleasePlan(self.check, 100, 1000))
+                bot = FakeBrowser(replace(self.view, evidence_id=evidence))
+                rejected = monitor.tick(100, bot)
+                self.assertEqual(rejected['state'], 'unknown')
+                self.assertIsNone(rejected['evidence'])
+                self.assertEqual(monitor.seen_evidence, set(self.check.observer_evidence))
+                bot.view = replace(self.view, evidence_id='fresh-recovery', captured_at=400, sample_at=400)
+                recovered = monitor.tick(400, bot)
+                self.assertTrue(recovered['recovery'] and recovered['report'])
+                self.assertEqual(recovered['state'], 'healthy')
+                self.assertIsNone(monitor.tick(1000, bot))
+
+    def test_valid_unknown_reference_remains_available(self):
+        # Policy permits 100-character evidence IDs; do not narrow this contract to 80.
+        for evidence in ('grounded-reference', 'x' * 100):
+            result = self.check.evaluate(replace(self.view, evidence_id=evidence, state='loading'), 100)
+            self.assertEqual(result['state'], 'unknown')
+            self.assertEqual(result['evidence'], evidence)

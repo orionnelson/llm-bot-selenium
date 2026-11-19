@@ -1,0 +1,28 @@
+{
+  "test": "actual public native project click",
+  "model_calls": 0,
+  "session_closed": true,
+  "phase": "finished",
+  "isolation": {
+    "mode": "container",
+    "browserSandbox": false
+  },
+  "guarded_pages": 2,
+  "guard_errors": [],
+  "matched_candidate": {
+    "expanded": null,
+    "href": "blog/opencv-update/",
+    "id": "c15",
+    "kind": "control",
+    "label": "Drivers Licence Scanner IAM OpenCV",
+    "reveals": false,
+    "target": "_blank",
+    "teamNames": []
+  },
+  "native_target": "_blank",
+  "clicks": 1,
+  "state": "passed",
+  "destination": "https://or9.ca/blog/opencv-update/",
+  "title": "Orion Neslon OpenCV",
+  "browser": "155.0.4283.45"
+}

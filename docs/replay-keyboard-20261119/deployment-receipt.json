@@ -1,0 +1,18 @@
+{
+  "state": "deployed",
+  "appSourceSHA256": "d4c244f27d670db2aba69960681c467327bd4452326067274d2392be881ccf1e",
+  "uiIndexSHA256": "98899f4444ac1e9073eca7a0586aed6411274d577c08172716c23e71d638f97e",
+  "canonicalUnchanged": true,
+  "priorRecordingsPreserved": 86,
+  "backendHashesPreserved": {
+    "triage/journey.py": "affdc0974a0d7736ecc57354c53b60abd72c46f283306320fdd1da59bae3ff8b",
+    "triage/public_browser.py": "2c9df9d8f5e6e41d56f4dacd6d29d71a1bc8dcf4838bd4946501bcc16b7be35b"
+  },
+  "reviewedExecutionDisabled503": true,
+  "authenticationPreserved": true,
+  "processesRestarted": false,
+  "sourceChanges": [
+    "ui/src/App.tsx",
+    "ui/src/keyboard-shortcuts.test.jsx"
+  ]
+}

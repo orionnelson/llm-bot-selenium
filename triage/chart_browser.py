@@ -13,7 +13,16 @@ from .core import Action, Context, GuardError
 from .selenium_port import SeleniumPort
 
 
+def _unique_fields(pairs):
+    data = dict(pairs)
+    if len(data) != len(pairs):
+        raise ValueError('duplicate chart evidence fields')
+    return data
+
+
 def binding_from_data(data):
+    if type(data['filters']) is not list or any(type(pair) is not list or len(pair) != 2 for pair in data['filters']):
+        raise GuardError('filter list of key/value lists required')
     binding = ChartBinding(Context(**data['context']), Action(**data['action']),
                            data['chart'], data['label'], tuple(tuple(p) for p in data['filters']))
     if set(data) != {'context', 'action', 'chart', 'label', 'filters'}:
@@ -31,22 +40,34 @@ class SeleniumChartPort(SeleniumPort):
 
     def read_visible(self, binding, route):
         binding.check()
+        session = self.session
         self._origin_check()
-        if route not in ('dashboard', 'entity-chart') or urlsplit(self.driver.current_url).path != '/chart/' + route:
+        url = self.driver.current_url
+        if route not in ('dashboard', 'entity-chart') or urlsplit(url).path != '/chart/' + route:
             raise GuardError('unexpected synthetic chart route')
         element = self._wait('[data-chart-view]')
         self._origin_check()
+        if self.driver.current_url != url:
+            raise GuardError('chart URL changed during read')
         if not element.is_displayed():
             raise GuardError('chart evidence is not visible')
         try:
             payload = element.get_attribute('data-chart-view')
             text = element.text
+            if element.get_attribute('data-chart-view') != payload or element.text != text:
+                raise GuardError('chart evidence changed during read')
+            if not element.is_displayed():
+                raise GuardError('chart evidence became hidden during read')
             self._origin_check()
+            if self.driver.current_url != url:
+                raise GuardError('chart URL changed during read')
             if not payload or len(payload) > 8192 or len(text) > 80:
                 raise ValueError('chart payload budget')
-            data = json.loads(payload)
+            data = json.loads(payload, object_pairs_hook=_unique_fields)
             if type(data) is not dict:
                 raise ValueError('chart object required')
+            if self.session != session:
+                raise GuardError('browser session changed during chart read')
             actual = binding_from_data(data.pop('binding'))
             view = ChartView(binding=actual, value=json.loads(text) if text else None, **data)
             if actual != binding:
@@ -59,7 +80,10 @@ class SeleniumChartPort(SeleniumPort):
         binding.check()
         if route not in ('dashboard', 'entity-chart'):
             raise GuardError('chart route not allowlisted')
+        session = self.session
         self._load('/chart/' + route + '?' + urlencode({'binding': json.dumps(asdict(binding))}))
+        if self.session != session:
+            raise GuardError('browser session changed during chart navigation')
         return self.read_visible(binding, route)
 
     def capture(self, observer, action, route, binding):

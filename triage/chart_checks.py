@@ -51,6 +51,8 @@ class ChartView:
     ui_version: str = 'chart-v1'
 
     def verify(self, binding, now):
+        if type(now) is not int or now < 0:
+            raise GuardError('nonnegative integer evaluation clock required')
         binding.check()
         if type(self.session_valid) is not bool:
             raise GuardError('typed session state required')
@@ -66,7 +68,7 @@ class ChartView:
             raise GuardError('sample outside bound chart time window')
         if self.state != 'ready':
             raise GuardError('chart loading or missing')
-        if type(self.value) not in (int, float) or not math.isfinite(self.value) or self.value < 0:
+        if type(self.value) not in (int, float) or (type(self.value) is float and not math.isfinite(self.value)) or self.value < 0:
             raise GuardError('missing or invalid chart value')
 
 
@@ -107,14 +109,20 @@ class SyntheticObserver:
         # Keep loading/expired evidence for the issue; interpretation must fail closed.
         identifier(view.evidence_id)
         identifier(view.ui_version)
-        if type(view.sample_at) is not int or type(view.session_valid) is not bool:
-            raise GuardError('typed sample timestamp and session state required')
-        if type(view.captured_at) is not int or (self.events and view.captured_at < self.events[-1].view.captured_at):
-            raise GuardError('ordered integer event timestamps required')
+        if type(view.sample_at) is not int or view.sample_at < 0 or type(view.session_valid) is not bool:
+            raise GuardError('nonnegative integer sample timestamp and typed session state required')
+        if type(view.captured_at) is not int or view.captured_at < 0 or (self.events and view.captured_at < self.events[-1].view.captured_at):
+            raise GuardError('ordered nonnegative integer event timestamps required')
+        if view.sample_at > view.captured_at:
+            raise GuardError('chart sample postdates its capture')
+        if not view.binding.context.start <= view.sample_at <= view.binding.context.end:
+            raise GuardError('sample outside bound chart time window')
         if view.state not in ('ready', 'loading', 'missing'):
             raise GuardError('invalid chart state')
-        if view.value is not None and (type(view.value) not in (int, float) or not math.isfinite(view.value)):
-            raise GuardError('typed numeric chart value required')
+        if view.value is not None and (type(view.value) not in (int, float) or (type(view.value) is float and not math.isfinite(view.value)) or view.value < 0):
+            raise GuardError('typed nonnegative numeric chart value required')
+        if any(event.view.evidence_id == view.evidence_id and event.view != view for event in self.events):
+            raise GuardError('conflicting observer evidence reference')
         self.events.append(IssueEvent(action, route, view))
 
     def stop(self):
@@ -128,27 +136,43 @@ class ChartCheck:
     maximum: float
     source_evidence: str
     observer_session: str
+    observer_evidence: tuple[str, ...] = ()
 
     def __post_init__(self):
         self.binding.check()
         identifier(self.source_evidence)
         identifier(self.observer_session)
-        if type(self.maximum) not in (int, float) or not math.isfinite(self.maximum) or self.maximum < 0:
+        if type(self.observer_evidence) is not tuple or len(self.observer_evidence) > 100:
+            raise GuardError('bounded immutable observer evidence required')
+        for evidence in self.observer_evidence:
+            identifier(evidence)
+        if type(self.maximum) not in (int, float) or (type(self.maximum) is float and not math.isfinite(self.maximum)) or self.maximum < 0:
             raise GuardError('explicit finite nonnegative maximum required')
 
     @classmethod
     def from_issue(cls, issue, maximum, *, sre_validated=False, now):
-        if sre_validated is not True or not issue.events:
+        if sre_validated is not True or not 1 <= len(issue.events) <= 100:
             raise GuardError('explicit SRE validation and observed chart required')
-        if type(maximum) not in (int, float) or not math.isfinite(maximum) or maximum < 0:
+        if type(maximum) not in (int, float) or (type(maximum) is float and not math.isfinite(maximum)) or maximum < 0:
             raise GuardError('explicit finite nonnegative maximum required')
+        # Dataclass construction is not proof that recorder guards ran.
+        checked = SyntheticObserver(issue.observer_session, [e.view.binding for e in issue.events], consent=True)
+        for event in issue.events:
+            checked.record(event.action, event.route, event.view)
         view = issue.events[-1].view
         view.verify(view.binding, now)
-        return cls(view.binding, maximum, view.evidence_id, issue.observer_session)
+        return cls(view.binding, maximum, view.evidence_id, issue.observer_session,
+                   tuple(event.view.evidence_id for event in issue.events))
 
-    def evaluate(self, view, now):
+    def evaluate(self, view, now, *, captured_since=0, sampled_since=0):
+        if not isinstance(view.evidence_id, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,100}', view.evidence_id):
+            return {'state': 'unknown', 'evidence': None, 'uncertainty': 'invalid evidence reference'}
         try:
             view.verify(self.binding, now)
+            if view.captured_at < captured_since:
+                raise GuardError('capture predates the required observation boundary')
+            if view.sample_at < sampled_since:
+                raise GuardError('sample predates the last verified chart sample')
         except GuardError as exc:
             return {'state': 'unknown', 'evidence': view.evidence_id, 'uncertainty': str(exc)}
         return {'state': 'healthy' if view.value <= self.maximum else 'failure',
@@ -160,7 +184,9 @@ def investigate_chart(issue, check, bot, *, now):
     """Deterministic synthetic baseline, NOT model-led page understanding."""
     if not issue.events or issue.observer_session != check.observer_session:
         raise GuardError('check/issue provenance mismatch')
-    if bot.session == issue.observer_session:
+    session = bot.session
+    identifier(session)
+    if session == issue.observer_session:
         raise GuardError('investigation requires a separate browser session')
     observed = issue.events[-1]
     if observed.view.evidence_id != check.source_evidence or observed.view.binding != check.binding:
@@ -172,11 +198,13 @@ def investigate_chart(issue, check, bot, *, now):
     route = 'entity-chart' if observed.route == 'dashboard' else 'dashboard'
     try:
         fresh = bot.read_chart(route, check.binding)
-        conclusion = check.evaluate(fresh, now)
+        if bot.session != session:
+            raise GuardError('investigation session changed during chart read')
+        conclusion = check.evaluate(fresh, now, captured_since=observed.view.captured_at, sampled_since=observed.view.sample_at)
     except Exception:
         return {'observed': interpretation, 'route': route,
                 'conclusion': {'state': 'unknown', 'evidence': None, 'uncertainty': 'chart read failed'}}
-    if fresh.evidence_id == check.source_evidence:
+    if fresh.evidence_id in check.observer_evidence or any(fresh.evidence_id == event.view.evidence_id for event in issue.events):
         conclusion = {'state': 'unknown', 'evidence': fresh.evidence_id, 'uncertainty': 'reused observer evidence'}
     return {'observed': interpretation, 'conclusion': conclusion, 'route': route}
 
@@ -207,8 +235,10 @@ class ReleaseMonitor:
         self.stopped = False
         self.last_state = None
         self.last_tick = -1
+        self.last_capture = plan.start
+        self.last_sample = 0
         # At most one read per cadence slot in the <=24h release window.
-        self.seen_evidence = {plan.check.source_evidence}
+        self.seen_evidence = {plan.check.source_evidence, *plan.check.observer_evidence}
 
     def stop(self):
         self.stopped = True
@@ -222,27 +252,37 @@ class ReleaseMonitor:
             return None
         if now < self.next_due:
             return None
-        if bot.session == self.plan.check.observer_session:
+        session = bot.session
+        identifier(session)
+        if session == self.plan.check.observer_session:
             raise GuardError('monitor requires a separate browser session')
         # Skip missed slots rather than burst/replay; always collect current evidence.
         self.next_due = self.plan.start + ((now - self.plan.start) // self.plan.cadence + 1) * self.plan.cadence
+        expired = False
         try:
             view = bot.read_chart('entity-chart', self.plan.check.binding)
             if self.stopped:
                 return None
+            if bot.session != session:
+                raise GuardError('monitor session changed during chart read')
+            expired = view.session_valid is False
             identifier(view.evidence_id)
-            result = self.plan.check.evaluate(view, now)
+            result = self.plan.check.evaluate(view, now, captured_since=self.last_capture, sampled_since=self.last_sample)
             if view.evidence_id in self.seen_evidence:
                 result = {'state': 'unknown', 'evidence': view.evidence_id, 'uncertainty': 'reused evidence within this release'}
+            if result['state'] != 'unknown':
+                self.last_capture = view.captured_at
+                self.last_sample = view.sample_at
             self.seen_evidence.add(view.evidence_id)
-            if not view.session_valid:
-                self.stop()
         except Exception:
             if self.stopped:
                 return None
             # Transport failures have no trusted evidence. Do not leak raw exception text.
             result = {'state': 'unknown', 'evidence': None, 'uncertainty': 'chart read failed'}
+        if expired:
+            self.stop()
         result['duplicate'] = result['state'] == self.last_state
-        result['report'] = result['state'] in ('failure', 'unknown') and not result['duplicate']
+        result['recovery'] = result['state'] == 'healthy' and self.last_state in ('failure', 'unknown')
+        result['report'] = result['recovery'] or (result['state'] in ('failure', 'unknown') and not result['duplicate'])
         self.last_state = result['state']
         return result

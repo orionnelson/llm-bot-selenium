@@ -1,6 +1,7 @@
+import type {DAGSpec} from './dag';
 import { parseSession, type TriageSession } from './snippets';
-export interface BrowserStep { proposal?:unknown; id:string;action:'click';candidate:string;label:string;locator:string;url:string;evidence:string;state:string;before:string;after?:string;videoMs:number }
-export interface BrowserRun { policy?:{mode?:string}; version:'browser-run/v1';id:string;taskId:string;status:string;evidenceKind:string;startedAt:string;url:string;model:string;modelCalls:number;frames:string[];steps:BrowserStep[];triage:TriageSession;video?:{url:string;kind:'action-frames';frameMs:number};verifiedResult?:string;error?:string;reason?:string }
+export interface BrowserStep { proposal?:unknown; generatedPython?:string;articles?:{title:string;url:string;text:string}[]; id:string;action:'click'|'navigate'|'observe'|'scroll'|'read'|'finish';result?:string;elapsedMs?:number;completedMs?:number;facts?:{label:string;count:number;text:string}[];screenshots?:{label:string;count:number;url:string}[];candidate:string;label:string;locator:string;url:string;evidence:string;state:string;before:string;after?:string;videoMs:number }
+export interface BrowserRun { currentUrl?:string; journey?:{instructions:string[];definition:DAGSpec}; sessionActive?:boolean;phase?:string;frameTimesMs?:number[];recording?:{kind:'timed-viewport-frames';intervalMs:number}; isolationMode?:'browser'|'container';isolation?:{mode:'browser'|'container';browserSandbox:boolean}; policy?:{mode?:string}; version:'browser-run/v1';id:string;taskId:string;status:string;evidenceKind:string;startedAt:string;url:string;model:string;modelCalls:number;frames:string[];steps:BrowserStep[];triage:TriageSession;video?:{url:string;kind:'action-frames';frameMs:number};verifiedResult?:string;error?:string;reason?:string }
 export const activeRun=(r:BrowserRun)=>['queued','running','cancelling'].includes(r.status);
 const validId=(id:string)=>{if(!/^[0-9a-f]{32}$/.test(id))throw Error('Invalid recording ID');return id;};
 export function recordingAsset(url:string){if(!/^\/api\/browser\/runs\/[0-9a-f]{32}\/(frame-\d{2}\.png|actions\.webm)$/.test(url))throw Error('Invalid private recording asset');return url;}
@@ -10,3 +11,4 @@ export async function browserHistory():Promise<BrowserRun[]>{const value=await r
 export async function browserRun(id:string):Promise<BrowserRun>{return parseRun(await request('/api/browser/runs/'+validId(id)));}
 export async function startBrowserRun(nodeId:string,revision:string,consent:boolean,video:boolean):Promise<string>{const value=await request('/api/browser/runs',{method:'POST',headers:{'Content-Type':'application/json','If-Match':revision},body:JSON.stringify({nodeId,consent,video})});return validId(value.id);}
 export async function cancelBrowserRun(id:string){return request('/api/browser/runs/'+validId(id)+'/cancel',{method:'POST'});}
+

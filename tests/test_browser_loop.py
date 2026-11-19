@@ -89,6 +89,7 @@ class FakeDriver:
         if 'data-sre-action="open-details"' in selector: return [Element(self, 'action', 'open-details')]
         return []
     def execute_script(self, script, *args):
+        if script == 'return document.documentURI': return self.current_url
         if script == MASK: self.masked = True; return Element(self, 'style')
         if script == 'arguments[0].remove()': self.masked = False; return None
         assert script == OBSERVE, 'No generated script may run'

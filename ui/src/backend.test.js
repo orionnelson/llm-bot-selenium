@@ -96,7 +96,7 @@ it('refuses an ambiguous Python definition rather than projecting its last keywo
 
 it('real HTTP generation returns an inert test candidate, never changing the saved DAG',async()=>{
  const saved=await loadDAG(),before=await readFile(join(directory,'dag.py'),'utf8');
- const response=await fetch('/api/python/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({nodeId:saved.definition.tasks[0].task_id,instructions:'Synthetic test only'})});
+ const response=await fetch('/api/python/generate',{method:'POST',headers:{'Content-Type':'application/json','If-Match':saved.revision},body:JSON.stringify({nodeId:saved.definition.tasks[0].task_id,instructions:'Synthetic test only'})});
  expect(response.status).toBe(200);const candidate=await response.json();
  expect(candidate.model).toBe('Qwen3.6-35B-A3B-UD-Q4_K_M-no-think');
  expect(candidate.review).toBe('pending');expect(candidate.executed).toBe(false);
@@ -122,4 +122,18 @@ it('projects and commits an authoritative Python parallel graph without losing a
   expect((await loadDAG()).revision).toBe(saved.revision);
   expect(await readFile(path,'utf8')).toBe(saved.python);
  }finally{await writeFile(path,before);}
+});
+
+
+it('refuses a stale editor generation before calling the model, then accepts reloaded context',async()=>{
+ const original=await loadDAG(),view=projectDAG(original);view.nodes[0].data.label='New canonical task';
+ const saved=await commitDAG(view,original.revision);
+ const body=JSON.stringify({nodeId:saved.definition.tasks[0].task_id,instructions:'Synthetic comparison'});
+ for(const revision of [undefined,original.revision]){
+  const response=await fetch('/api/python/generate',{method:'POST',headers:{'Content-Type':'application/json',...(revision?{'If-Match':revision}:{})},body});
+  expect(response.status).toBe(409);expect(await response.json()).not.toHaveProperty('source');
+ }
+ const response=await fetch('/api/python/generate',{method:'POST',headers:{'Content-Type':'application/json','If-Match':saved.revision},body});
+ expect(response.status).toBe(200);expect((await response.json()).executed).toBe(false);
+ expect((await loadDAG()).revision).toBe(saved.revision);
 });

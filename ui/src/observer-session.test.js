@@ -18,7 +18,7 @@ binding = ChartBinding(Context('synthetic', 'test', 'checkout', 0, 2000), Action
 view = ChartView(binding, 'private-evidence-id', 100, 100, 0)
 observer = SyntheticObserver(port.session, [binding], consent=True)
 observer.record('navigate', 'dashboard', view)
-observer.record('shortcut-open-chart', 'entity-chart', replace(view, captured_at=102))
+observer.record('shortcut-open-chart', 'entity-chart', replace(view, evidence_id='private-evidence-id-2', captured_at=102))
 print(json.dumps(port.export_studio_session(observer.stop(), consent=True)))`;
  const result=spawnSync('python3',['-c',code],{cwd:root,encoding:'utf8'});
  expect(result.status,result.stderr).toBe(0);

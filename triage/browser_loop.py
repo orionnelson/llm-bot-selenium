@@ -140,6 +140,10 @@ def capture(driver, folder, index):
         png = root.screenshot_as_png
     finally:
         driver.execute_script('arguments[0].remove()', style)
+    return write_frame(png, folder, index)
+
+
+def write_frame(png, folder, index):
     if not isinstance(png, bytes) or len(png) > 1048576 or png[:8] != b'\x89PNG\r\n\x1a\n' or len(png) < 24 or png[12:16] != b'IHDR':
         raise BrowserBlocked('Invalid/oversized recording frame')
     width, height = struct.unpack('>II', png[16:24])
