@@ -1,0 +1,8 @@
+{
+  "ownerAppSHA256": "d4c244f27d670db2aba69960681c467327bd4452326067274d2392be881ccf1e",
+  "repoAppSHA256": "2d2244376757cff69311f1c2c6150fe913cbff929f7139b4bfbb7194b032ab4b",
+  "sharedGlobalHandlerIdentical": true,
+  "testFileIdentical": true,
+  "base": "cfb27cfbf86d92c698de8469866fa1c8480d6b49",
+  "variantNotWholeAppEquivalence": true
+}
