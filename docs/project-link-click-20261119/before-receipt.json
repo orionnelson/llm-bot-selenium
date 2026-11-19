@@ -1,0 +1,34 @@
+{
+  "initial": {
+    "candidateCount": 25,
+    "matches": [
+      {
+        "expanded": null,
+        "href": "blog/opencv-update/",
+        "id": "c15",
+        "kind": "control",
+        "label": "Drivers Licence Scanner IAM OpenCV",
+        "reveals": false,
+        "teamNames": []
+      }
+    ],
+    "blocker": "The requested click target is not observed. No unrelated control clicked."
+  },
+  "after_news_and_hover": {
+    "candidateCount": 68,
+    "matches": [
+      {
+        "expanded": null,
+        "href": "blog/opencv-update/",
+        "id": "c15",
+        "kind": "control",
+        "label": "Drivers Licence Scanner IAM OpenCV",
+        "reveals": false,
+        "teamNames": []
+      }
+    ],
+    "blocker": "The requested click target is not observed. No unrelated control clicked."
+  },
+  "guard_blocked_hosts": [],
+  "session_closed": true
+}

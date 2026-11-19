@@ -1,0 +1,57 @@
+{
+  "test": "normal app Record/public click/new tab/current UI",
+  "state": "passed",
+  "run_id": "c40193ad430c4efc8727d27e1ed606bb",
+  "model": "Qwen3.6-35B-A3B-UD-Q4_K_M-no-think",
+  "modelCalls": 1,
+  "run_status": "passed",
+  "session_closed": true,
+  "controller_sessions_closed": true,
+  "worker_session_closed": true,
+  "canonical_unchanged": true,
+  "all_prior_recordings_unchanged": true,
+  "ui_writes": [
+    {
+      "method": "POST",
+      "path": "/api/browser/journeys"
+    }
+  ],
+  "browser": "155.0.4283.45",
+  "ui_bundle": [
+    "http://opencode-svc.llms.svc.cluster.local:3002/assets/index-Bo2ZZklr.js"
+  ],
+  "destination": "https://or9.ca/blog/opencv-update/",
+  "steps": [
+    {
+      "id": "navigate",
+      "label": "Open or9.ca",
+      "state": "verified",
+      "result": "Orion Nelson - Computer Security",
+      "actions": []
+    },
+    {
+      "id": "step-1",
+      "label": "Click on Drivers Licence Scanner Project",
+      "state": "verified",
+      "result": "Clicked Drivers Licence Scanner IAM OpenCV",
+      "actions": [
+        {
+          "action": "click",
+          "candidate": "c15",
+          "label": "Drivers Licence Scanner IAM OpenCV",
+          "url": "https://or9.ca/",
+          "afterUrl": "https://or9.ca/blog/opencv-update/",
+          "navigationContext": "new-tab",
+          "verification": {
+            "kind": "observed-page-change",
+            "changed": [
+              "url",
+              "text",
+              "candidates"
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
