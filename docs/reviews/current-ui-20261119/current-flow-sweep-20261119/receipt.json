@@ -1,0 +1,140 @@
+{
+  "authenticated_render": true,
+  "workflow_executed": false,
+  "saved": false,
+  "session_closed": true,
+  "isolation": {
+    "mode": "container",
+    "browserSandbox": false
+  },
+  "flows": [
+    {
+      "name": "recording-setup-no-submit",
+      "state": "passed"
+    },
+    {
+      "name": "step-0-View",
+      "state": "passed"
+    },
+    {
+      "name": "step-0-Code",
+      "state": "passed"
+    },
+    {
+      "name": "step-0-Outcomes",
+      "state": "passed"
+    },
+    {
+      "name": "step-0-Before",
+      "state": "passed"
+    },
+    {
+      "name": "step-0-After",
+      "state": "passed"
+    },
+    {
+      "name": "step-1-View",
+      "state": "passed"
+    },
+    {
+      "name": "step-1-Code",
+      "state": "passed"
+    },
+    {
+      "name": "step-1-Outcomes",
+      "state": "passed"
+    },
+    {
+      "name": "step-1-Before",
+      "state": "passed"
+    },
+    {
+      "name": "step-1-After",
+      "state": "passed"
+    },
+    {
+      "name": "step-2-View",
+      "state": "passed"
+    },
+    {
+      "name": "step-2-Code",
+      "state": "passed"
+    },
+    {
+      "name": "step-2-Outcomes",
+      "state": "passed"
+    },
+    {
+      "name": "step-2-Before",
+      "state": "passed"
+    },
+    {
+      "name": "step-2-After",
+      "state": "passed"
+    },
+    {
+      "name": "retained-public-failure-missing-frame",
+      "state": "passed",
+      "recording": "586d2c2f7f7143e8bc147cf29173e841"
+    },
+    {
+      "name": "editor-json-and-mobile-no-save",
+      "state": "passed"
+    }
+  ],
+  "state": "completed",
+  "canonical_unchanged": true,
+  "ui_write_requests": [],
+  "recording_unchanged": true,
+  "modelCalls_unchanged": true,
+  "browser": "155.0.4283.45",
+  "ui_bundle": [
+    "http://opencode-svc.llms.svc.cluster.local:3002/assets/index-Bo2ZZklr.js"
+  ],
+  "limitations": [
+    "No new recording, generation, scheduled monitor, saved draft, or reviewed execution initiated; these screenshots do not prove those execution flows."
+  ],
+  "screenshots": [
+    "step-1-after-component.png",
+    "step-0-after-component.png",
+    "step-1-after-full.png",
+    "step-2-before-component.png",
+    "02-recording-setup-no-submit-full.png",
+    "step-2-after-component.png",
+    "step-1-before-full.png",
+    "step-0-before-component.png",
+    "step-0-outcomes-full.png",
+    "step-2-after-full.png",
+    "step-0-view-full.png",
+    "step-1-before-component.png",
+    "failure-outcomes-mobile-full.png",
+    "step-0-code-component.png",
+    "failure-outcomes-desktop-full.png",
+    "editor-mobile-full.png",
+    "failure-missing-after-desktop-full.png",
+    "step-2-code-full.png",
+    "step-0-view-component.png",
+    "01-current-app-initial-full.png",
+    "step-2-view-component.png",
+    "step-2-outcomes-component.png",
+    "step-2-code-component.png",
+    "step-2-outcomes-full.png",
+    "step-0-code-full.png",
+    "editor-unsaved-draft-desktop-full.png",
+    "step-1-code-component.png",
+    "step-1-code-full.png",
+    "step-2-view-full.png",
+    "step-1-outcomes-full.png",
+    "failure-outcomes-mobile-component.png",
+    "step-0-after-full.png",
+    "failure-outcomes-desktop-component.png",
+    "step-1-view-full.png",
+    "failure-missing-after-desktop-component.png",
+    "editor-json-dialog-desktop-full.png",
+    "step-1-outcomes-component.png",
+    "step-0-outcomes-component.png",
+    "step-2-before-full.png",
+    "step-1-view-component.png",
+    "step-0-before-full.png"
+  ]
+}

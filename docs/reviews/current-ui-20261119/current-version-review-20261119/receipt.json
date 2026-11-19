@@ -1,0 +1,53 @@
+{
+  "authenticated_render": true,
+  "workflow_executed": false,
+  "saved": false,
+  "session_closed": true,
+  "isolation": {
+    "mode": "container",
+    "browserSandbox": false
+  },
+  "latest_recording_automatic": true,
+  "editor_viewport_preserved": true,
+  "actual_export_ast_validated": true,
+  "long_recording_auto_graph": true,
+  "mobile_graph_auto_fitted": true,
+  "expanded_mobile_readable_scale": 1.08293,
+  "full_frame_aspect_preserved": true,
+  "original_frame_opened": true,
+  "state": "passed",
+  "automatic_correct_five_node_dag": true,
+  "dag_modal_correct_generated_source": true,
+  "node_step_frame_source_sync": true,
+  "draft_bytes_preserved": true,
+  "saved_editor_restored": true,
+  "preview_ctrl_s_no_write": true,
+  "before_after_exact": true,
+  "readonly_view_requests": [],
+  "modelCalls_unchanged": 2,
+  "recording_unchanged": true,
+  "browser": "155.0.4283.45",
+  "ui_bundle": [
+    "http://opencode-svc.llms.svc.cluster.local:3002/assets/index-Bo2ZZklr.js"
+  ],
+  "screenshots": [
+    "automatic-dag-after-desktop-dag.png",
+    "recording-outcomes-desktop-full.png",
+    "automatic-dag-before-desktop-dag.png",
+    "recording-outcomes-desktop-dag.png",
+    "automatic-dag-before-desktop-full.png",
+    "automatic-recording-mobile-replay.png",
+    "automatic-recording-mobile-dag.png",
+    "automatic-dag-after-desktop-replay.png",
+    "automatic-dag-after-desktop-full.png",
+    "recording-code-desktop-replay.png",
+    "expanded-mobile-graph.png",
+    "automatic-dag-before-desktop-replay.png",
+    "recording-code-mobile.png",
+    "recording-code-desktop-dag.png",
+    "automatic-recording-mobile-full.png",
+    "recording-code-desktop-full.png",
+    "recording-outcomes-desktop-replay.png"
+  ],
+  "canonical_unchanged": true
+}

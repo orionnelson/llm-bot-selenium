@@ -1,0 +1,103 @@
+{
+  "authenticated_render": true,
+  "workflow_executed": false,
+  "saved": false,
+  "session_closed": true,
+  "isolation": {
+    "mode": "container",
+    "browserSandbox": false
+  },
+  "flows": [
+    {
+      "name": "Schedule-no-submit",
+      "state": "passed"
+    },
+    {
+      "name": "Share-no-submit",
+      "state": "passed"
+    },
+    {
+      "name": "Demo history-no-submit",
+      "state": "passed"
+    },
+    {
+      "name": "advanced-disabled-execution",
+      "state": "passed"
+    },
+    {
+      "name": "library-Components",
+      "state": "passed"
+    },
+    {
+      "name": "library-Apps",
+      "state": "passed"
+    },
+    {
+      "name": "library-Templates",
+      "state": "passed"
+    },
+    {
+      "name": "library-Snippets",
+      "state": "passed"
+    },
+    {
+      "name": "inspector-Steps",
+      "state": "passed"
+    },
+    {
+      "name": "inspector-Node Config",
+      "state": "passed"
+    },
+    {
+      "name": "inspector-Task DAG",
+      "state": "passed"
+    },
+    {
+      "name": "inspector-Python",
+      "state": "passed"
+    },
+    {
+      "name": "inspector-LLM Prompt",
+      "state": "passed"
+    },
+    {
+      "name": "inspector-Outputs",
+      "state": "passed"
+    },
+    {
+      "name": "inspector-Error Handling",
+      "state": "passed"
+    }
+  ],
+  "advanced_run_disabled": true,
+  "state": "completed",
+  "ui_write_requests": [],
+  "canonical_unchanged": true,
+  "browser": "155.0.4283.45",
+  "ui_bundle": [
+    "http://opencode-svc.llms.svc.cluster.local:3002/assets/index-Bo2ZZklr.js"
+  ],
+  "limitations": [
+    "Dialogs/library/inspector viewing only; no scheduling, sharing upload, generation, execution, Save or configuration changes submitted."
+  ],
+  "screenshots": [
+    "schedule-desktop.png",
+    "inspector-error-handling.png",
+    "inspector-node-config.png",
+    "library-apps.png",
+    "library-templates.png",
+    "advanced-disabled-executor.png",
+    "share-desktop.png",
+    "library-components.png",
+    "inspector-outputs.png",
+    "inspector-task-dag.png",
+    "demo-history-mobile.png",
+    "inspector-llm-prompt.png",
+    "demo-history-desktop.png",
+    "inspector-python.png",
+    "schedule-mobile.png",
+    "share-mobile.png",
+    "library-snippets.png",
+    "inspector-steps.png"
+  ]
+}

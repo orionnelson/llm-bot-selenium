@@ -1,0 +1,48 @@
+{
+  "authenticated_render": true,
+  "workflow_executed": false,
+  "saved": false,
+  "session_closed": true,
+  "isolation": {
+    "mode": "container",
+    "browserSandbox": false
+  },
+  "findings": [
+    {
+      "id": "space-shortcut",
+      "confirmed": true,
+      "selected_after_space": "View",
+      "unexpected_demo_pause_control": false
+    },
+    {
+      "id": "modal-keyboard",
+      "confirmed": true,
+      "focus_on_open": {
+        "inDialog": false,
+        "tag": "BUTTON",
+        "text": "Full DAG"
+      },
+      "escape_dialog_still_open": true
+    },
+    {
+      "id": "recording-load-race",
+      "confirmed": true,
+      "latest_user_selection": "f8fff0719f844836a734a7b3bc3da5cb",
+      "observed_after_old_request_completed": "cb4226b49a7240dda3c63a4d144030b2",
+      "method": "hold earlier actual GET until later actual GET finishes; no synthetic response or DOM mutations"
+    }
+  ],
+  "state": "completed",
+  "ui_write_requests": [],
+  "canonical_unchanged": true,
+  "browser": "155.0.4283.45",
+  "ui_bundle": [
+    "http://opencode-svc.llms.svc.cluster.local:3002/assets/index-Bo2ZZklr.js"
+  ],
+  "screenshots": [
+    "p2-race-stale-a-overwrites-latest-b.png",
+    "p2-full-dag-escape-does-not-close.png",
+    "p2-race-latest-b-selection-before-old-a.png",
+    "p2-space-shortcut-overrides-code-tab.png"
+  ]
+}
